@@ -1,10 +1,13 @@
 const express = require(`express`),
     cookieParser = require(`cookie-parser`),
     logger = require(`morgan`),
-    createError = require(`http-errors`),
+    path = require('path'),
+
     app = express(),
     
-    recordRouter = require(`./routes/record`);
+    recordRouter = require(`./routes/record`),
+    
+    staticDir = path.join(__dirname, `client/out`);
 
 app.use(logger(`dev`));
 app.use(express.json());
@@ -13,9 +16,8 @@ app.use(cookieParser());
 
 app.use(`/api/record`, recordRouter);
 
-app.get(`/`, async (req, res) => {
-    return res.status(200).send({ "success": true });
-});
+// serve static frontend files
+app.use(express.static(staticDir, { extensions: ['html'] }));
 
 // redirect any other GET requests to index as fallback
 app.get(`/*any`, async (req, res) => {
@@ -24,7 +26,7 @@ app.get(`/*any`, async (req, res) => {
 
 // catch 404 for non-GET requests (POST, PUT, DELETE, etc.) and forward to error handler
 app.use(async (req, res, next) => {
-  next(createError(404));
+  return res.status(404).json({ "error": "Route not found" });
 });
 
 module.exports = app;
