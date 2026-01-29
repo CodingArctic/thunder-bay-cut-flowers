@@ -1,4 +1,4 @@
-CREATE DATABASE flowers IF NOT EXISTS;
+CREATE DATABASE IF NOT EXISTS flowers;
 
 \c flowers;
 
