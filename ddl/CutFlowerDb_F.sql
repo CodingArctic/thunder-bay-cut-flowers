@@ -1,4 +1,4 @@
-DROP DATABASE flowers;
+DROP DATABASE flowers WITH (FORCE);
 
 CREATE DATABASE flowers;
 
