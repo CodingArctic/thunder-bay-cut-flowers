@@ -2,6 +2,8 @@ DROP DATABASE flowers WITH (FORCE);
 
 CREATE DATABASE flowers;
 
+ALTER DATABASE flowers OWNER TO flowers;
+
 \c flowers;
 
 CREATE TABLE users (
