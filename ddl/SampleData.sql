@@ -1,3 +1,15 @@
+BEGIN;
+
+DELETE FROM records;
+DELETE FROM users_monitors;
+DELETE FROM monitors;
+DELETE FROM users;
+
+-- Reset auto-increment sequences
+ALTER SEQUENCE users_user_id_seq RESTART WITH 1;
+ALTER SEQUENCE monitors_monitor_id_seq RESTART WITH 1;
+ALTER SEQUENCE records_record_id_seq RESTART WITH 1;
+
 INSERT INTO users (email, username, password) VALUES
 ('grower1@farm.com', 'green_valley', 'hashed_pw_1'),
 ('grower2@farm.com', 'sunrise_farms', 'hashed_pw_2');
@@ -52,4 +64,6 @@ INSERT INTO records (monitor_id, time, value, file_path) VALUES
 (3, NOW() - INTERVAL '60 minutes',  0.61, '/data/monitors/3/060.jpg'),
 (3, NOW() - INTERVAL '40 minutes',  0.64, '/data/monitors/3/040.jpg'),
 (3, NOW() - INTERVAL '20 minutes',  0.68, '/data/monitors/3/020.jpg');
+
+COMMIT;
 
