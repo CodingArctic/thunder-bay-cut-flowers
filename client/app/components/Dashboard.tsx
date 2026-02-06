@@ -1,4 +1,4 @@
-// import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
 const chartData = [
   { time: '8:00am', value: 82 },
@@ -41,7 +41,7 @@ export function Dashboard() {
             LAST HOUR OVERVIEW
           </h2>
           
-          {/* <div className="mt-6">
+          <div className="mt-6">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0d0d0" />
@@ -50,7 +50,7 @@ export function Dashboard() {
                 <Bar dataKey="value" fill="#ffa07a" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div> */}
+          </div>
 
           <div className="mt-6 space-y-2">
             {dataOverview.map((item, index) => (
