@@ -25,7 +25,7 @@ router.post(`/:monitorId`, async (req, res) => {
     if (req.files && Object.keys(req.files).length !== 0) {
         const uploadedFile = req.files.flower;
 
-        if (uploadedFile.mimetype !== 'image/jpeg') { // may need to change depending on esp32 img format
+        if (uploadedFile.mimetype !== 'image/jpeg') {
             return res.status(400).json({ "error": "Invalid file type" });
         }
 
