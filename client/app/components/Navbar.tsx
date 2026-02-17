@@ -18,10 +18,8 @@ export function Navbar({ currentPage, onNavigate }: NavbarProps) {
               currentPage === 'dashboard' 
                 ? 'bg-[#ffd966] text-gray-800' 
                 : 'bg-transparent text-gray-600 hover:bg-gray-100'
-            }`}
-          >
+            }`}>
             <LayoutDashboard size={18} />
-            Dashboard
           </button>
           <button
             onClick={() => onNavigate('data')}
@@ -29,10 +27,8 @@ export function Navbar({ currentPage, onNavigate }: NavbarProps) {
               currentPage === 'data' 
                 ? 'bg-[#ffd966] text-gray-800' 
                 : 'bg-transparent text-gray-600 hover:bg-gray-100'
-            }`}
-          >
+            }`}>
             <Database size={18} />
-            Data
           </button>
           <button
             onClick={() => onNavigate('settings')}
@@ -40,14 +36,12 @@ export function Navbar({ currentPage, onNavigate }: NavbarProps) {
               currentPage === 'settings' 
                 ? 'bg-[#ffd966] text-gray-800' 
                 : 'bg-transparent text-gray-600 hover:bg-gray-100'
-            }`}
-          >
+            }`}>
             <SettingsIcon size={18} />
-            Settings
           </button>
         </div>
 
-        {/* Right side buttons */}
+        {/* Right side buttons
         <div className="flex items-center gap-3">
           <button 
             className="p-2 hover:bg-gray-100 rounded-full transition"
@@ -62,7 +56,7 @@ export function Navbar({ currentPage, onNavigate }: NavbarProps) {
           >
             <LogOut size={20} className="text-gray-600" />
           </button>
-        </div>
+        </div> */}
       </div>
     </div>
   );
