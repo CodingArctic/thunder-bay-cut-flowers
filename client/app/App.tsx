@@ -15,14 +15,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f5f0eb] relative overflow-hidden">
-      {/* Grid background pattern */}
-      <div className="absolute inset-0 opacity-30" style={{
-        backgroundImage: `
-          linear-gradient(to right, #ffc9c9 1px, transparent 1px),
-          linear-gradient(to bottom, #ffc9c9 1px, transparent 1px)
-        `,
-        backgroundSize: '40px 40px'
-      }} />
+
       
       {/* Top Navigation Bar */}
       <div className="relative z-20 bg-white/80 backdrop-blur-sm border-b border-gray-200">
