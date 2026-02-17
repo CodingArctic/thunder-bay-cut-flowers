@@ -41,14 +41,14 @@ export function Navbar({ currentPage, onNavigate }: NavbarProps) {
           </button>
         </div>
 
-        {/* Right side buttons
+       
         <div className="flex items-center gap-3">
-          <button 
+          {/* <button 
             className="p-2 hover:bg-gray-100 rounded-full transition"
             title="Notifications"
           >
             <Bell size={20} className="text-gray-600" />
-          </button>
+          </button> */}
           <button 
             onClick={() => window.location.href = '/login'}
             className="p-2 hover:bg-gray-100 rounded-full transition"
@@ -56,7 +56,7 @@ export function Navbar({ currentPage, onNavigate }: NavbarProps) {
           >
             <LogOut size={20} className="text-gray-600" />
           </button>
-        </div> */}
+        </div>
       </div>
     </div>
   );
