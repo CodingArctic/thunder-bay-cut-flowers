@@ -50,9 +50,16 @@ export default function Login({ onLogin }:LoginProps) {
 
           <button
             type="submit"
-            className="w-full bg-[#ffd966] text-gray-800 py-3 rounded-lg font-medium hover:bg-[#ffce3d] transition mt-8"
+            className="w-45 mr-2 bg-[#ffd966] text-gray-800 py-3 rounded-lg font-medium hover:bg-[#ffce3d] transition mt-8"
           >
             Log In
+          </button>
+
+          <button
+            //type="submit"
+            className="w-45 bg-[#ffd966] text-gray-800 py-3 rounded-lg font-medium hover:bg-[#ffce3d] transition mt-8"
+          >
+            Sign Up
           </button>
         </form>
       </div>
