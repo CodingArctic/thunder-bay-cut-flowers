@@ -17,7 +17,7 @@ export default function Login({ onLogin }:LoginProps) {
 
   return (
     <div className="min-h-screen bg-[#fef9e6] relative overflow-hidden flex items-center justify-center px-4">
-      {/* Decorative sunflower - left */} 
+      {/* Decorative sunflower - left */}
 
       {/* Login Form */}
       <div className="bg-white rounded-lg shadow-lg p-10 w-full max-w-md relative z-10">
@@ -48,19 +48,22 @@ export default function Login({ onLogin }:LoginProps) {
             />
           </div>
 
-          <button
-            type="submit"
-            className="w-45 mr-2 bg-[#ffd966] text-gray-800 py-3 rounded-lg font-medium hover:bg-[#ffce3d] transition mt-8"
-          >
-            Log In
-          </button>
+          <div className='flex gap-4'>
+            <button
+              type="submit"
+              className="w-1/2 mr-2 bg-[#ffd966] text-gray-800 py-3 rounded-lg font-medium hover:bg-[#ffce3d] transition mt-8"
+            >
+              Log In
+            </button>
 
-          <button
-            //type="submit"
-            className="w-45 bg-[#ffd966] text-gray-800 py-3 rounded-lg font-medium hover:bg-[#ffce3d] transition mt-8"
-          >
-            Sign Up
-          </button>
+            <button
+              type="button"
+              onClick={() => (window.location.href = '/signup')}
+              className="w-1/2 bg-[#ffd966] text-gray-800 py-3 rounded-lg font-medium hover:bg-[#ffce3d] transition mt-8"
+            >
+              Sign Up
+            </button>
+          </div>
         </form>
       </div>
     </div>
