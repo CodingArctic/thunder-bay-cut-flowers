@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Navbar } from "./components/Navbar";
 import { Dashboard } from "./components/Dashboard";
 import { Data } from "./components/Data";
@@ -7,6 +8,15 @@ import { Settings } from "./components/Settings";
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const router = useRouter();
+
+  useEffect(() => {
+    const isLoggedIn = localStorage.getItem('isLoggedIn');
+
+    if (!isLoggedIn) {
+      router.push('/login');
+    }
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-[#f5f0eb] relative overflow-hidden">

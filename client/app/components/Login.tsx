@@ -12,6 +12,7 @@ export default function Login({ onLogin }:LoginProps) {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    localStorage.setItem('isLoggedIn', 'true');
      onLogin();
   };
 
