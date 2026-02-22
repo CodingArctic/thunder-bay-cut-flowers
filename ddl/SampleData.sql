@@ -8,8 +8,8 @@ TRUNCATE TABLE records, users_monitors, monitors, users RESTART IDENTITY CASCADE
 -- Sequences are automatically reset by RESTART IDENTITY above
 
 INSERT INTO users (email, username, password) VALUES
-('grower1@farm.com', 'green_valley', 'hashed_pw_1'),
-('grower2@farm.com', 'sunrise_farms', 'hashed_pw_2');
+('grower1@farm.com', 'green_valley', '$2a$12$oYYHWhjYpM7HDEJEbXWeAu0dNKK1rixiofSKeLLBPAmL1REkJSvSO'), -- grower1pw
+('grower2@farm.com', 'sunrise_farms', '$2a$12$PwkVHXfBQG74SH622qiIUeWDXC9BeTX2ZGtZZ0WX1zCZnERbdzOry'); -- grower2pw
 
 INSERT INTO monitors (name) VALUES
 ('dehydrating_device'),
