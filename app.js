@@ -30,6 +30,7 @@ app.use((req, res, next) => {
     "/api/login",
     "/api/register",
     "/api/record",
+    "/", // temporary while frontend login/registration is being wired up
     "/login",
     "/register"
   ];
