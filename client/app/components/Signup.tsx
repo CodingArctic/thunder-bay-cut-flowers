@@ -11,6 +11,7 @@ export default function Signup({ onSignup }: SignupProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -72,6 +73,20 @@ export default function Signup({ onSignup }: SignupProps) {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
               placeholder="Enter email"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-600 mb-2">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
+              placeholder="Enter phone number"
               required
             />
           </div>

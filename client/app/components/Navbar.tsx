@@ -1,5 +1,6 @@
 'use client';
 import { Bell, LogOut, LayoutDashboard, Database, Settings as SettingsIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface NavbarProps {
   currentPage: string;
@@ -7,6 +8,11 @@ interface NavbarProps {
 }
 
 export function Navbar({ currentPage, onNavigate }: NavbarProps) {
+  const router = useRouter();
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    router.push('/login');
+  };
   return (
     <div className="relative z-20 bg-white/80 backdrop-blur-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
@@ -49,8 +55,8 @@ export function Navbar({ currentPage, onNavigate }: NavbarProps) {
           >
             <Bell size={20} className="text-gray-600" />
           </button> */}
-          <button 
-            onClick={() => window.location.href = '/login'}
+          <button
+            onClick={handleLogout}
             className="p-2 hover:bg-gray-100 rounded-full transition"
             title="Log out"
           >
