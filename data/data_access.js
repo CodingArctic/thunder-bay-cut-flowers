@@ -111,7 +111,43 @@ async function monitorExists(monitorID) {
     return true;
 }
 
+/**
+ * Get a user by username
+ * Used during login authentication
+ * @param {string} username
+ * @returns {Object|null}
+ */
+async function getUserByUsername(username) {
+    const users = await getData("users", "*", { username });
+
+    if (!users || users.length === 0) {
+        return null;
+    }
+
+    return users[0];
+}
+
+
+/**
+ * Insert a new user into the database
+ * Used during registration
+ * @param {string} email
+ * @param {string} username
+ * @param {string} passwordHash
+ * @returns {Object|null}
+ */
+
+async function createUser(email, username, passwordHash) {
+    return await insertData("users", {
+        email: email,
+        username: username,
+        password: passwordHash
+    });
+}
+
 module.exports = {
     addRecord,
-    monitorExists
-}
+    monitorExists,
+    getUserByUsername,
+    createUser
+};
