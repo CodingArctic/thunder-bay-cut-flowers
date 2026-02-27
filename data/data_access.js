@@ -172,10 +172,53 @@ async function createUser(email, username, passwordHash) {
     });
 }
 
+async function getPastRecords(monitorID, limit) {
+    const records = await getData(
+        `records`,
+        [`record_id`, `monitor_id`, `time`, `value`],
+        { monitor_id: monitorID },
+        limit,
+        { property: `time`, order: `DESC` }
+    );
+
+    if (!records || records.length === 0) {
+        return null;
+    }
+
+    return records;
+}
+
+/**
+ * Get a single record by its ID
+ * @param {int} recordID - The primary key of the record
+ * @returns {Object|null} The record row or null
+ */
+async function getRecordById(recordID) {
+    const records = await getData(`records`, "*", { record_id: recordID });
+    if (!records || records.length === 0) {
+        return null;
+    }
+    return records[0];
+}
+
+/**
+ * Check whether a user is associated with a monitor via the users_monitors junction table
+ * @param {int} userID - The user's ID
+ * @param {int} monitorID - The monitor's ID
+ * @returns {boolean} True if the association exists
+ */
+async function userCanAccessMonitor(userID, monitorID) {
+    const rows = await getData(`users_monitors`, "*", { user_id: userID, monitor_id: monitorID });
+    return rows !== null && rows.length > 0;
+}
+
 module.exports = {
     addRecord,
     monitorExists,
     getUserByUsername,
     getUserByEmail,
-    createUser
+    createUser,
+    getPastRecords,
+    getRecordById,
+    userCanAccessMonitor
 };
