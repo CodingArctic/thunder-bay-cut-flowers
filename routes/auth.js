@@ -33,7 +33,7 @@ function requireAuth(req, res, next) {
 
         if (!token) {
             // No token - handle based on route type
-            if (req.path.startsWith('/api/')) {
+            if (req.originalUrl.startsWith('/api/')) {
                 return res.status(401).json({ error: "Authentication required" });
             } else {
                 return res.redirect('/login');
@@ -48,7 +48,7 @@ function requireAuth(req, res, next) {
         next(); // allow request to continue
     } catch (err) {
         // Invalid or expired token - handle based on route type
-        if (req.path.startsWith('/api/')) {
+        if (req.originalUrl.startsWith('/api/')) {
             return res.status(401).json({ error: "Invalid or expired token" });
         } else {
             return res.redirect('/login');

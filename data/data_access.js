@@ -19,9 +19,11 @@ const pool = new Pool({
  * @param {string} table - The table name
  * @param {string|Array} columns - Columns to select
  * @param {Object} criteria - WHERE clause criteria as key-value pairs
+ * @param {int} limit - Number of rows to return
+ * @param {Object} orderBy - Order by options including `property` and `order`
  * @returns {Array|null} Array of rows or null on error
  */
-async function getData(table, columns = "*", criteria = {}) {
+async function getData(table, columns = "*", criteria = {}, limit = 0, orderBy = {}) {
     const colList = Array.isArray(columns) ? columns.join(", ") : columns;
 
     const keys = Object.keys(criteria);
@@ -32,7 +34,17 @@ async function getData(table, columns = "*", criteria = {}) {
             ? "WHERE " + keys.map((k, i) => `${k} = $${i + 1}`).join(" AND ")
             : "";
 
-    const text = `SELECT ${colList} FROM ${table} ${whereClause};`;
+    const orderClause =
+        Object.keys(orderBy).length > 1
+            ? `ORDER BY ${orderBy.property} ${orderBy.order}`
+            : "";
+
+    const limitClause =
+        limit !== 0
+            ? "LIMIT " + limit
+            : "";
+
+    const text = `SELECT ${colList} FROM ${table} ${whereClause} ${orderClause} ${limitClause};`;
 
     try {
         const { rows } = await pool.query(text, values);
@@ -160,10 +172,53 @@ async function createUser(email, username, passwordHash) {
     });
 }
 
+async function getPastRecords(monitorID, limit) {
+    const records = await getData(
+        `records`,
+        [`record_id`, `monitor_id`, `time`, `value`],
+        { monitor_id: monitorID },
+        limit,
+        { property: `time`, order: `DESC` }
+    );
+
+    if (!records || records.length === 0) {
+        return null;
+    }
+
+    return records;
+}
+
+/**
+ * Get a single record by its ID
+ * @param {int} recordID - The primary key of the record
+ * @returns {Object|null} The record row or null
+ */
+async function getRecordById(recordID) {
+    const records = await getData(`records`, "*", { record_id: recordID });
+    if (!records || records.length === 0) {
+        return null;
+    }
+    return records[0];
+}
+
+/**
+ * Check whether a user is associated with a monitor via the users_monitors junction table
+ * @param {int} userID - The user's ID
+ * @param {int} monitorID - The monitor's ID
+ * @returns {boolean} True if the association exists
+ */
+async function userCanAccessMonitor(userID, monitorID) {
+    const rows = await getData(`users_monitors`, "*", { user_id: userID, monitor_id: monitorID });
+    return rows !== null && rows.length > 0;
+}
+
 module.exports = {
     addRecord,
     monitorExists,
     getUserByUsername,
     getUserByEmail,
-    createUser
+    createUser,
+    getPastRecords,
+    getRecordById,
+    userCanAccessMonitor
 };

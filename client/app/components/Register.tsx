@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { apiRequest } from '../utils/api-request';
-import { useRouter } from 'next/navigation';
 
 export default function Register() {
   const [firstName, setFirstName] = useState('');
@@ -14,8 +13,6 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -31,7 +28,7 @@ export default function Register() {
 
     try {
       await apiRequest(`/api/register`, `POST`, { username, password, firstName, lastName, email, phoneNumber });
-      router.push('/login');
+      window.location.href = '/login';
     } catch (error: any) {
       setError(error.message);
     }
