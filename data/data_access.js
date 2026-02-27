@@ -127,6 +127,21 @@ async function getUserByUsername(username) {
     return users[0];
 }
 
+/**
+ * Get a user by email
+ * @param {string} email
+ * @returns {Object|null}
+ */
+async function getUserByEmail(email) {
+    const users = await getData("users", "*", { email });
+
+    if (!users || users.length === 0) {
+        return null;
+    }
+
+    return users[0];
+}
+
 
 /**
  * Insert a new user into the database
@@ -149,5 +164,6 @@ module.exports = {
     addRecord,
     monitorExists,
     getUserByUsername,
+    getUserByEmail,
     createUser
 };
