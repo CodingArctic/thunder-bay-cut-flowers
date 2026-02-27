@@ -26,11 +26,20 @@ router.post("/", async (req, res) => {
         }
 
         // Check if username already exists
-        const existingUser = await db.getUserByUsername(username);
+        let existingUser = await db.getUserByUsername(username);
 
         if (existingUser) {
             return res.status(409).json({
                 error: "Username already exists"
+            });
+        }
+
+        // Check if email already exists
+        existingUser = await db.getUserByEmail(email);
+
+        if (existingUser) {
+            return res.status(409).json({
+                error: "Email already registered"
             });
         }
 

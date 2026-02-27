@@ -6,13 +6,8 @@ import { Settings } from './components/Settings';
 //import { LogOut, Bell } from 'lucide-react';
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
-
-  if (!isLoggedIn) {
-    return <Login onLogin={() => setIsLoggedIn(true)} />;
-  }
-
+  
   return (
     <div className="min-h-screen bg-[#f5f0eb] relative overflow-hidden">
 
@@ -60,7 +55,6 @@ export default function App() {
               {/* <Bell className="w-5 h-5 text-gray-600" /> */}
             </button>
             <button 
-              onClick={() => setIsLoggedIn(false)}
               className="p-2 hover:bg-gray-100 rounded-full transition"
               title="Log out"
             >

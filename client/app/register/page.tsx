@@ -1,12 +1,6 @@
-'use client';
+import Register from '../components/Register';
 
-import Signup from '../components/Signup';
+export default function RegisterPage() {
 
-export default function SignupPage() {
-  const handleSignup = () => {
-    // Redirect after successful signup
-    window.location.href = '/';
-  };
-
-  return <Signup onSignup={handleSignup} />;
+  return <Register />;
 }

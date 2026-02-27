@@ -2,12 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { apiRequest } from '../utils/api-request';
+import { useRouter } from 'next/navigation';
 
-type SignupProps = {
-  onSignup: () => void;
-};
-
-export default function Signup({ onSignup }: SignupProps) {
+export default function Register() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -15,16 +13,29 @@ export default function Signup({ onSignup }: SignupProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    if (password !== confirmPassword) {
-      alert('Passwords do not match');
+    if (username.trim().length < 8 || password.trim().length < 8) {
+      setError('Both username and password must be 8+ characters.');
       return;
     }
 
-    onSignup();
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/register`, `POST`, { username, password, firstName, lastName, email, phoneNumber });
+      router.push('/login');
+    } catch (error: any) {
+      setError(error.message);
+    }
+
   };
 
   return (
@@ -35,7 +46,7 @@ export default function Signup({ onSignup }: SignupProps) {
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
+          <div>
             <label className="block text-sm text-gray-600 mb-2">
               First Name
             </label>
@@ -43,8 +54,8 @@ export default function Signup({ onSignup }: SignupProps) {
               type="text"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
-              placeholder="Enter first name"
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
+              placeholder="Jane"
               required
             />
           </div>
@@ -57,8 +68,8 @@ export default function Signup({ onSignup }: SignupProps) {
               type="text"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
-              placeholder="Enter last name"
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
+              placeholder="Doe"
               required
             />
           </div>
@@ -71,8 +82,8 @@ export default function Signup({ onSignup }: SignupProps) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
-              placeholder="Enter email"
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
+              placeholder="jane@doe.com"
               required
             />
           </div>
@@ -85,8 +96,8 @@ export default function Signup({ onSignup }: SignupProps) {
               type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
-              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
-              placeholder="Enter phone number"
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
+              placeholder="585-555-5555"
               required
             />
           </div>
@@ -99,8 +110,8 @@ export default function Signup({ onSignup }: SignupProps) {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
-              placeholder="Choose a username"
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
+              placeholder="jane_doe"
               required
             />
           </div>
@@ -113,7 +124,7 @@ export default function Signup({ onSignup }: SignupProps) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="Create a password"
               required
             />
@@ -127,29 +138,35 @@ export default function Signup({ onSignup }: SignupProps) {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="Confirm password"
               required
             />
           </div>
 
+          {error && (
+            <div className='text-red-600'>
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
             className="w-full bg-[#ffd966] text-gray-800 py-3 rounded-lg font-medium hover:bg-[#ffce3d] transition mt-4"
           >
-            Sign Up
+            Register
           </button>
         </form>
         <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-                Already have an account?{' '}
-                <Link
-                href="/login"
-                className="text-[#d4a017] font-medium hover:underline"
-                >
-                Click here!
-                </Link>
-            </p>
+          <p className="text-sm text-gray-600">
+            Already have an account?{' '}
+            <Link
+              href="/login"
+              className="text-[#d4a017] font-medium hover:underline"
+            >
+              Click here!
+            </Link>
+          </p>
         </div>
       </div>
     </div>
