@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-type SignupProps = {
-  onSignup: () => void;
+type RegisterProps = {
+  onRegister: () => void;
 };
 
-export default function Signup({ onSignup }: SignupProps) {
+export default function Register({ onRegister }: RegisterProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -24,7 +24,7 @@ export default function Signup({ onSignup }: SignupProps) {
       return;
     }
 
-    onSignup();
+    onRegister();
   };
 
   return (
@@ -137,7 +137,7 @@ export default function Signup({ onSignup }: SignupProps) {
             type="submit"
             className="w-full bg-[#ffd966] text-gray-800 py-3 rounded-lg font-medium hover:bg-[#ffce3d] transition mt-4"
           >
-            Sign Up
+            Register
           </button>
         </form>
         <div className="mt-6 text-center">
