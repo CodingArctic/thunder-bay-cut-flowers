@@ -19,9 +19,11 @@ const pool = new Pool({
  * @param {string} table - The table name
  * @param {string|Array} columns - Columns to select
  * @param {Object} criteria - WHERE clause criteria as key-value pairs
+ * @param {int} limit - Number of rows to return
+ * @param {Object} orderBy - Order by options including `property` and `order`
  * @returns {Array|null} Array of rows or null on error
  */
-async function getData(table, columns = "*", criteria = {}) {
+async function getData(table, columns = "*", criteria = {}, limit = 0, orderBy = {}) {
     const colList = Array.isArray(columns) ? columns.join(", ") : columns;
 
     const keys = Object.keys(criteria);
@@ -32,7 +34,17 @@ async function getData(table, columns = "*", criteria = {}) {
             ? "WHERE " + keys.map((k, i) => `${k} = $${i + 1}`).join(" AND ")
             : "";
 
-    const text = `SELECT ${colList} FROM ${table} ${whereClause};`;
+    const orderClause =
+        Object.keys(orderBy).length > 1
+            ? `ORDER BY ${orderBy.property} ${orderBy.order}`
+            : "";
+
+    const limitClause =
+        limit !== 0
+            ? "LIMIT " + limit
+            : "";
+
+    const text = `SELECT ${colList} FROM ${table} ${whereClause} ${orderClause} ${limitClause};`;
 
     try {
         const { rows } = await pool.query(text, values);
