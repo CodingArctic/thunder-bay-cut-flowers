@@ -2,12 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { apiRequest } from '../utils/api-request';
+import { useRouter } from 'next/navigation';
 
-type RegisterProps = {
-  onRegister: () => void;
-};
-
-export default function Register({ onRegister }: RegisterProps) {
+export default function Register() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -15,16 +13,29 @@ export default function Register({ onRegister }: RegisterProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    if (password !== confirmPassword) {
-      alert('Passwords do not match');
+    if (username.trim().length < 8 || password.trim().length < 8) {
+      setError('Both username and password must be 8+ characters.');
       return;
     }
 
-    onRegister();
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/register`, `POST`, { username, password, firstName, lastName, email, phoneNumber });
+      router.push('/login');
+    } catch (error: any) {
+      setError(error.message);
+    }
+
   };
 
   return (
