@@ -2,25 +2,31 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { apiRequest } from '../utils/api-request';
 
-type LoginProps = {
-  onLogin: () => void;
-};
-
-export default function Login({ onLogin }: LoginProps) {
+export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    localStorage.setItem('isLoggedIn', 'true');
-    onLogin();
+    if (username.trim().length < 8 || password.trim().length < 8) {
+      setError('Both username and password must be 8+ characters.');
+      return;
+    }
+    try {
+      await apiRequest(`/api/login`, `POST`, { username, password });
+      router.push('/');
+    } catch (error: any) {
+      setError(error.message);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#fef9e6] relative overflow-hidden flex items-center justify-center px-4">
-      {/* Decorative sunflower - left */}
-
       {/* Login Form */}
       <div className="bg-white rounded-lg shadow-lg p-10 w-full max-w-md relative z-10">
         <h1 className="text-2xl font-bold text-gray-800 mb-8">WELCOME BACK</h1>
@@ -32,8 +38,8 @@ export default function Login({ onLogin }: LoginProps) {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
-              placeholder="Type in username"
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
+              placeholder="jane_doe"
               required
             />
           </div>
@@ -44,8 +50,8 @@ export default function Login({ onLogin }: LoginProps) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 outline-none transition bg-transparent"
-              placeholder="Type in password"
+              className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
+              placeholder="s3curePasswordWow!"
               required
             />
           </div>
@@ -58,6 +64,12 @@ export default function Login({ onLogin }: LoginProps) {
               Log In
             </button>
           </div>
+
+          {error && (
+            <div className='text-red-600'>
+              {error}
+            </div>
+          )}
         </form>
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
