@@ -76,7 +76,7 @@ CREATE TABLE alerts (
     alert_id SERIAL PRIMARY KEY,
     record_id INTEGER NOT NULL REFERENCES records(record_id) ON DELETE CASCADE,
     alert_type TEXT NOT NULL,
-    alert_method TEXT,
+    alert_method As enum('email', 'sms') NOT NULL,
     triggered_at TIMESTAMPTZ DEFAULT NOW()
 );
 
