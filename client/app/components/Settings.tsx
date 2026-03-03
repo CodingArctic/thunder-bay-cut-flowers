@@ -1,4 +1,43 @@
+import { useState } from "react";
+type NotificationKey =
+  | "wateringNeeded" | "severeDrought"
+  | "healthDecrease" | "flowerDecrease";
+
+type ToggleProps = {
+  enabled: boolean;
+  onToggle: () => void;
+};
 export function Settings() {
+  const [notifications, setNotifications] = useState<Record<NotificationKey, boolean>>({
+    wateringNeeded: false,
+    severeDrought: false,
+    healthDecrease: false,
+    flowerDecrease: false,
+  });
+
+  const toggleNotification = (key: NotificationKey) => {
+    setNotifications((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const Toggle = ({ enabled, onToggle }: ToggleProps) => (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${
+        enabled ? "bg-green-500" : "bg-gray-300"
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 ${
+          enabled ? "translate-x-6" : "translate-x-1"
+        }`}
+      />
+    </button>
+  );
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-8">
@@ -44,58 +83,34 @@ export function Settings() {
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-700">Watering Needed</span>
-                <div className="flex gap-2">
-                  {[...Array(5)].map((_, i) => (
-                    <div 
-                      key={i}
-                      className={`w-3 h-3 rounded-full ${
-                        i < 3 ? 'bg-yellow-400' : 'bg-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
+                <Toggle
+                  enabled={notifications.wateringNeeded}
+                  onToggle={() => toggleNotification("wateringNeeded")}
+                />
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <span className="text-gray-700">Severe Drought</span>
-                <div className="flex gap-2">
-                  {[...Array(5)].map((_, i) => (
-                    <div 
-                      key={i}
-                      className={`w-3 h-3 rounded-full ${
-                        i < 4 ? 'bg-red-400' : 'bg-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
+                <Toggle
+                  enabled={notifications.severeDrought}
+                  onToggle={() => toggleNotification("severeDrought")}
+                />
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <span className="text-gray-700">Health Decrease</span>
-                <div className="flex gap-2">
-                  {[...Array(5)].map((_, i) => (
-                    <div 
-                      key={i}
-                      className={`w-3 h-3 rounded-full ${
-                        i < 2 ? 'bg-orange-400' : 'bg-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
+                <Toggle
+                  enabled={notifications.healthDecrease}
+                  onToggle={() => toggleNotification("healthDecrease")}
+                />
               </div>
-              
+
               <div className="flex items-center justify-between">
-                <span className="text-gray-700">Flower Decease</span>
-                <div className="flex gap-2">
-                  {[...Array(5)].map((_, i) => (
-                    <div 
-                      key={i}
-                      className={`w-3 h-3 rounded-full ${
-                        i < 5 ? 'bg-purple-400' : 'bg-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
+                <span className="text-gray-700">Flower Decrease</span>
+                <Toggle
+                  enabled={notifications.flowerDecrease}
+                  onToggle={() => toggleNotification("flowerDecrease")}
+                />
               </div>
             </div>
           </div>
