@@ -1,7 +1,6 @@
 import { useState } from "react";
 type NotificationKey =
-  | "wateringNeeded" | "severeDrought"
-  | "healthDecrease" | "flowerDecrease";
+  | "emailNotifications" | "textNotifications";
 
 type ToggleProps = {
   enabled: boolean;
@@ -9,10 +8,8 @@ type ToggleProps = {
 };
 export function Settings() {
   const [notifications, setNotifications] = useState<Record<NotificationKey, boolean>>({
-    wateringNeeded: false,
-    severeDrought: false,
-    healthDecrease: false,
-    flowerDecrease: false,
+    emailNotifications: false,
+    textNotifications: false,
   });
 
   const toggleNotification = (key: NotificationKey) => {
@@ -82,34 +79,18 @@ export function Settings() {
             
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-gray-700">Watering Needed</span>
+                <span className="text-gray-700">Email</span>
                 <Toggle
-                  enabled={notifications.wateringNeeded}
-                  onToggle={() => toggleNotification("wateringNeeded")}
+                  enabled={notifications.emailNotifications}
+                  onToggle={() => toggleNotification("emailNotifications")}
                 />
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-gray-700">Severe Drought</span>
+                <span className="text-gray-700">Text</span>
                 <Toggle
-                  enabled={notifications.severeDrought}
-                  onToggle={() => toggleNotification("severeDrought")}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700">Health Decrease</span>
-                <Toggle
-                  enabled={notifications.healthDecrease}
-                  onToggle={() => toggleNotification("healthDecrease")}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700">Flower Decrease</span>
-                <Toggle
-                  enabled={notifications.flowerDecrease}
-                  onToggle={() => toggleNotification("flowerDecrease")}
+                  enabled={notifications.textNotifications}
+                  onToggle={() => toggleNotification("textNotifications")}
                 />
               </div>
             </div>
