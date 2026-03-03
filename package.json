@@ -1,5 +1,8 @@
 {
   "name": "thunder-bay-cut-flowers",
+  "scripts": {
+    "seed-images": "node scripts/seed-demo-images.js"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
@@ -9,5 +12,8 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
     "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "jimp": "^1.6.0"
   }
 }

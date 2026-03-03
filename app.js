@@ -30,7 +30,6 @@ app.use((req, res, next) => {
     "/api/login",
     "/api/register",
     "/api/record",
-    "/", // temporary while frontend login/registration is being wired up
     "/login",
     "/register"
   ];
@@ -39,7 +38,7 @@ app.use((req, res, next) => {
   const isPublicPath = publicPaths.some(p => req.path === p || req.path.startsWith(p + '/'));
 
   // Allow static assets (CSS, JS, images, etc.)
-  const isStaticAsset = /\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json|map)$/i.test(req.path);
+  const isStaticAsset = /\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json|map|txt)$/i.test(req.path);
 
   // Allow Next.js internal files
   const isNextInternal = req.path.startsWith('/_next/');
