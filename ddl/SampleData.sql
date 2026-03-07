@@ -79,7 +79,7 @@ INSERT INTO records (monitor_id, time, dehydration_score, file_path) VALUES
 -------------------------------------------------
 INSERT INTO alerts (record_id, alert_type, alert_method)
 VALUES
-(10, 'Critical Dehydration', 'SMS'),
-(23, 'Warning Dehydration', 'Email');
+(10, 'Critical Dehydration', 'sms'),
+(25, 'Warning Dehydration', 'email');
 
 COMMIT;
