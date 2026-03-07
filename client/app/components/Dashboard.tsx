@@ -91,7 +91,7 @@ export function Dashboard() {
               ))}
             </select>
           </div>
-          
+
           <div className="mt-6">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData}>
@@ -123,7 +123,7 @@ export function Dashboard() {
         <div className="space-y-6">
           <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
             <h2 className="text-lg font-bold text-gray-800 mb-6">CURRENT HEALTH MESSAGE</h2>
-            
+
             <div className="bg-[#ffe4b8] rounded-lg p-8 text-center">
               <div className="text-6xl mb-4">{getHealthEmoji(latestScore)}</div>
               <div className="flex items-center justify-center">
@@ -155,6 +155,24 @@ export function Dashboard() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Latest Photo */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
+            <h2 className="text-sm font-bold text-gray-800 mb-3 bg-[#ffd9a3] inline-block px-3 py-1 rounded">
+              LATEST PHOTO
+            </h2>
+            {latestRecordID ? (
+              <img 
+                src={`/api/record/image/${latestRecordID}`}
+                alt="Latest flower photo"
+                className="w-full aspect-video object-contain bg-gray-100 rounded-lg"
+              />
+            ) : (
+              <div className="w-full aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
+                <span className="text-gray-500">No photo available</span>
+              </div>
+            )}
           </div>
 
         </div>
