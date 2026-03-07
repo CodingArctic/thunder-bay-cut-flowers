@@ -154,6 +154,25 @@ async function getUserByEmail(email) {
     return users[0];
 }
 
+/**
+ * Get a user by user ID
+ * Returns all user fields except password for security
+ * @param {int} userId
+ * @returns {Object|null}
+ */
+async function getUserById(userId) {
+    const users = await getData("users", 
+        ["user_id", "email", "username", "first_name", "last_name", "phone_number"], 
+        { user_id: userId }
+    );
+
+    if (!users || users.length === 0) {
+        return null;
+    }
+
+    return users[0];
+}
+
 
 /**
  * Insert a new user into the database
@@ -228,6 +247,7 @@ module.exports = {
     monitorExists,
     getUserByUsername,
     getUserByEmail,
+    getUserById,
     createUser,
     getPastRecords,
     getRecordById,
