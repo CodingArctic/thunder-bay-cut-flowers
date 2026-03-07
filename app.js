@@ -9,6 +9,8 @@ const express = require(`express`),
   recordRouter = require(`./routes/record`),
   loginRouter = require(`./routes/login`),
   registerRouter = require(`./routes/register`),
+  monitorsRouter = require(`./routes/monitors`),
+  userRouter = require(`./routes/user`),
   { requireAuth } = require(`./routes/auth`),
 
   staticDir = path.join(__dirname, `client/out`);
@@ -18,11 +20,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(fileUpload());
-
-// API routes (before auth middleware)
-app.use(`/api/login`, loginRouter);
-app.use(`/api/register`, registerRouter);
-app.use(`/api/record`, recordRouter);
 
 // Authentication middleware (protect private routes)
 app.use((req, res, next) => {
@@ -50,6 +47,15 @@ app.use((req, res, next) => {
   // Otherwise, require authentication
   return requireAuth(req, res, next);
 });
+
+// Public API routes
+app.use(`/api/login`, loginRouter);
+app.use(`/api/register`, registerRouter);
+app.use(`/api/record`, recordRouter);
+
+// Protected API routes (after auth middleware)
+app.use(`/api/monitors`, monitorsRouter);
+app.use(`/api/user`, userRouter);
 
 // Serve static frontend files (after auth middleware)
 app.use(express.static(staticDir, { 

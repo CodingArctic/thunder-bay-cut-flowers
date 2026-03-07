@@ -154,6 +154,25 @@ async function getUserByEmail(email) {
     return users[0];
 }
 
+/**
+ * Get a user by user ID
+ * Returns all user fields except password for security
+ * @param {int} userId
+ * @returns {Object|null}
+ */
+async function getUserById(userId) {
+    const users = await getData("users", 
+        ["user_id", "email", "username", "first_name", "last_name", "phone_number"], 
+        { user_id: userId }
+    );
+
+    if (!users || users.length === 0) {
+        return null;
+    }
+
+    return users[0];
+}
+
 
 /**
  * Insert a new user into the database
@@ -175,7 +194,7 @@ async function createUser(email, username, passwordHash) {
 async function getPastRecords(monitorID, limit) {
     const records = await getData(
         `records`,
-        [`record_id`, `monitor_id`, `time`, `value`],
+        [`record_id`, `monitor_id`, `time`, `dehydration_score`],
         { monitor_id: monitorID },
         limit,
         { property: `time`, order: `DESC` }
@@ -185,7 +204,8 @@ async function getPastRecords(monitorID, limit) {
         return null;
     }
 
-    return records;
+    // Reverse to get chronological order (oldest to newest) for chart display
+    return records.reverse();
 }
 
 /**
@@ -212,13 +232,25 @@ async function userCanAccessMonitor(userID, monitorID) {
     return rows !== null && rows.length > 0;
 }
 
+/**
+ * Get all monitors associated with the specified user
+ * @param {int} userID - The user's ID
+ * @returns {Array} Array of available monitor_id
+ */
+async function getMonitors(userID) {
+    const rows = await getData(`users_monitors`, "monitor_id", { user_id: userID });
+    return rows;
+}
+
 module.exports = {
     addRecord,
     monitorExists,
     getUserByUsername,
     getUserByEmail,
+    getUserById,
     createUser,
     getPastRecords,
     getRecordById,
-    userCanAccessMonitor
+    userCanAccessMonitor,
+    getMonitors
 };

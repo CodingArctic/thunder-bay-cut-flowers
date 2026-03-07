@@ -1,26 +1,63 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { apiRequest } from '../utils/api-request';
 
-const dataPoints = [
-  { time: '8:00am', value: '0.94' },
-  { time: '8:15am', value: '0.86' },
-  { time: '8:30am', value: '0.91' },
-  { time: '8:45am', value: '0.88' },
-  { time: '9:00am', value: '0.95' },
-  { time: '9:15am', value: '0.82' },
-  { time: '9:30am', value: '0.89' },
-  { time: '9:45am', value: '0.92' },
-  { time: '10:00am', value: '0.87' },
-  { time: '10:15am', value: '0.93' },
-  { time: '10:30am', value: '0.85' },
-  { time: '11:00am', value: '0.90' },
-  { time: '11:15am', value: '0.88' }
-];
-
-const radius = 30;
+const radius = 40;
 const circumference = 2 * Math.PI * radius;
-const progress = 0.91;
+
+// Helper function to get emoji based on health score
+function getHealthEmoji(score: number): string {
+  if (score >= 0.9) return '😊';  // Excellent
+  if (score >= 0.7) return '🙂';  // Good
+  if (score >= 0.5) return '😐';  // Fair
+  if (score >= 0.3) return '😟';  // Poor
+  return '😞';  // Critical
+}
 
 export function Data() {
+  const [error, setError] = useState('');
+  const [monitorID, setMonitorID] = useState('');
+  const [monitorOptions, setMonitorOptions] = useState<number[]>([]);
+  const [records, setRecords] = useState<any[]>([]);
+  const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
+
+  useEffect(() => {
+    const fetchMonitors = async () => {
+      try {
+        let response = await apiRequest(`/api/monitors/all`, `GET`) as { monitorIDs: number[] };
+        const monitors = response.monitorIDs || [];
+        setMonitorOptions(monitors);
+        // Set the first available monitor as default if not already set
+        if (monitors.length > 0 && !monitorID) {
+          setMonitorID(String(monitors[0]));
+        }
+      } catch (error: any) {
+        setError(error.message);
+      }
+    };
+    fetchMonitors();
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await apiRequest(`/api/record/recent/${monitorID}?limit=20`, `GET`);
+        setRecords(Array.isArray(data) ? data.reverse() : []);
+        // Set the first record as selected by default
+        if (Array.isArray(data) && data.length > 0) {
+          setSelectedRecord(data[0]);
+        } else {
+          setSelectedRecord(null);
+        }
+      } catch (error: any) {
+        setError(error.message);
+      }
+    };
+    if (monitorID) {
+      fetchData();
+    }
+  }, [monitorID]);
+
+  const progress = selectedRecord ? selectedRecord.dehydration_score : 0;
   return (
     <div>
       <div className="flex items-center gap-2 mb-8">
@@ -38,11 +75,45 @@ export function Data() {
               DATA OVERVIEW
             </h2>
             
+            <div className="mb-4">
+              <label htmlFor="monitor-select" className="block text-sm font-medium text-gray-700 mb-2">
+                Select Monitor:
+              </label>
+              <select
+                id="monitor-select"
+                value={monitorID}
+                onChange={(e) => setMonitorID(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
+              >
+                <option value="">-- Select a Monitor --</option>
+                {monitorOptions.map((id) => (
+                  <option key={id} value={id}>
+                    Monitor {id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="mt-6 space-y-2 max-h-[400px] overflow-y-auto">
-              {dataPoints.map((item, index) => (
-                <div key={index} className="flex justify-between text-sm py-1">
-                  <span className="text-gray-600">{item.time}</span>
-                  <span className="text-gray-800 font-medium">{item.value}</span>
+              {records.map((record, index) => (
+                <div 
+                  key={record.record_id} 
+                  className={`flex justify-between text-sm py-2 px-3 rounded cursor-pointer hover:bg-[#ffd9a3]/30 transition-colors ${
+                    selectedRecord?.record_id === record.record_id ? 'bg-[#ffd9a3]/50' : ''
+                  }`}
+                  onClick={() => setSelectedRecord(record)}
+                >
+                  <span className="text-gray-600">
+                    {new Date(record.time).toLocaleString([], { 
+                      month: 'short', 
+                      day: 'numeric',
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </span>
+                  <span className="text-gray-800 font-medium">
+                    {Math.round(record.dehydration_score * 100)}%
+                  </span>
                 </div>
               ))}
             </div>
@@ -54,51 +125,54 @@ export function Data() {
           {/* Photo from Image/VIDEO Folder */}
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
             <h2 className="text-sm font-bold text-gray-800 mb-3 bg-[#ffd9a3] inline-block px-3 py-1 rounded">
-              PHOTO FROM IMAGE/VIDEO FOLDER
+              PHOTO FROM SELECTED RECORD
             </h2>
-            <img 
-              src="https://images.unsplash.com/photo-1597848212624-e704ce46e90e?w=600&h=400&fit=crop" 
-              alt="Sunflower"
-              className="w-full h-64 object-cover rounded-lg"
-            />
+            {selectedRecord ? (
+              <img 
+                src={`/api/record/image/${selectedRecord.record_id}`}
+                alt="Flower photo"
+                className="w-full aspect-video object-contain bg-gray-100 rounded-lg"
+              />
+            ) : (
+              <div className="w-full aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
+                <span className="text-gray-500">No photo available</span>
+              </div>
+            )}
           </div>
 
           {/* Overall Flower Health */}
           <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
             <h2 className="text-sm font-bold text-gray-800 mb-4 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
-              OVERALL FLOWER HEALTH
+              FLOWER HEALTH AT SELECTED TIME
             </h2>
             
             <div className="bg-[#ffe4b8] rounded-lg p-6 text-center mt-4">
-              <div className="text-5xl mb-4">😎</div>
-              <div className="flex items-center justify-center gap-4">
-                <div>
-                  <div className="text-3xl font-bold text-gray-800">0.91</div>
-                  <div className="text-sm text-gray-600 mt-1">Health Score</div>
-                </div>
+              <div className="text-5xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
+              <div className="flex items-center justify-center">
                 <div className="relative">
-                  <svg width="70" height="70" viewBox="0 0 70 70">
+                  <svg width="100" height="100" viewBox="0 0 100 100">
                     <circle
-                      cx="35"
-                      cy="35"
-                      r="30"
+                      cx="50"
+                      cy="50"
+                      r="40"
                       fill="none"
                       stroke="#ffd9a3"
-                      strokeWidth="7"
+                      strokeWidth="8"
                     />
                     <circle
-                      cx="35"
-                      cy="35"
-                      r="30"
+                      cx="50"
+                      cy="50"
+                      r="40"
                       fill="none"
                       stroke="#ff6b6b"
-                      strokeWidth="7"
-                      strokeDasharray={`${circumference * progress} ${circumference}`}
+                      strokeWidth="8"
+                      strokeDasharray={circumference}
                       strokeDashoffset={circumference * (1 - progress)}
-                      transform="rotate(-90 35 35)"
+                      strokeLinecap="butt"
+                      transform="rotate(-90 50 50)"
                     />
-                    <text x="35" y="40" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#333">
-                      91%
+                    <text x="50" y="58" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">
+                      {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : '0%'}
                     </text>
                   </svg>
                 </div>
