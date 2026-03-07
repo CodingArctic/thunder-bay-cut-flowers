@@ -22,7 +22,15 @@ const dataOverview = [
 
 const radius = 35;
 const circumference = 2 * Math.PI * radius;
-const progress = 0.94;
+
+// Helper function to get emoji based on health score
+function getHealthEmoji(score: number): string {
+  if (score >= 0.9) return '😊';  // Excellent
+  if (score >= 0.7) return '🙂';  // Good
+  if (score >= 0.5) return '😐';  // Fair
+  if (score >= 0.3) return '😟';  // Poor
+  return '😞';  // Critical
+}
 
 export function Dashboard() {
   return (
@@ -68,35 +76,31 @@ export function Dashboard() {
             <h2 className="text-lg font-bold text-gray-800 mb-6">CURRENT HEALTH MESSAGE</h2>
             
             <div className="bg-[#ffe4b8] rounded-lg p-8 text-center">
-              <div className="text-6xl mb-4">😊</div>
-              <div className="flex items-center justify-center gap-4">
-                <div>
-                  <div className="text-4xl font-bold text-gray-800">0.94</div>
-                  <div className="text-sm text-gray-600 mt-1">Health Score</div>
-                </div>
+              <div className="text-6xl mb-4">{getHealthEmoji(latestScore)}</div>
+              <div className="flex items-center justify-center">
                 <div className="relative">
-                  <svg width="80" height="80" viewBox="0 0 80 80">
+                  <svg width="120" height="120" viewBox="0 0 120 120">
                     <circle
-                      cx="40"
-                      cy="40"
-                      r="35"
+                      cx="60"
+                      cy="60"
+                      r="50"
                       fill="none"
                       stroke="#ffd9a3"
-                      strokeWidth="8"
+                      strokeWidth="10"
                     />
                     <circle
-                      cx="40"
-                      cy="40"
-                      r="35"
+                      cx="60"
+                      cy="60"
+                      r="50"
                       fill="none"
                       stroke="#ff6b6b"
-                      strokeWidth="8"
-                      strokeDasharray={`${circumference * progress} ${circumference}`}
-                      strokeDashoffset={circumference * (1 - progress)}
-                      transform="rotate(-90 40 40)"
+                      strokeWidth="10"
+                      strokeDasharray={`${circumference * latestScore} ${circumference}`}
+                      strokeDashoffset={circumference * (1 - latestScore)}
+                      transform="rotate(-90 60 60)"
                     />
-                    <text x="40" y="45" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#333">
-                      94%
+                    <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
+                      {Math.round(latestScore * 100)}%
                     </text>
                   </svg>
                 </div>
