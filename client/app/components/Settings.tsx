@@ -1,4 +1,39 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { apiRequest } from '../utils/api-request';
+
+interface UserData {
+  user_id: number;
+  email: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  phone_number: string | null;
+}
+
 export function Settings() {
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setLoading(true);
+        const data = await apiRequest<UserData>('/api/user/me', 'GET');
+        setUserData(data);
+      } catch (err) {
+        console.error('Failed to fetch user data:', err);
+        setError('Failed to load account information');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-8">
@@ -15,22 +50,37 @@ export function Settings() {
             ACCOUNT INFO
           </h2>
           
-          <div className="mt-6 space-y-4">
-            <div>
-              <label className="block text-sm text-gray-600 mb-2">Full Name</label>
-              <div className="text-gray-800 py-2 border-b border-gray-300">Firstname Lastname</div>
+          {loading ? (
+            <div className="mt-6 text-gray-600">Loading account information...</div>
+          ) : error ? (
+            <div className="mt-6 text-red-600">{error}</div>
+          ) : userData ? (
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Full Name</label>
+                <div className="text-gray-800 py-2 border-b border-gray-300">
+                  {userData.first_name} {userData.last_name}
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Username</label>
+                <div className="text-gray-800 py-2 border-b border-gray-300">{userData.username}</div>
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Email</label>
+                <div className="text-gray-800 py-2 border-b border-gray-300">{userData.email}</div>
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-600 mb-2">Phone Number</label>
+                <div className="text-gray-800 py-2 border-b border-gray-300">
+                  {userData.phone_number || 'Not provided'}
+                </div>
+              </div>
             </div>
-            
-            <div>
-              <label className="block text-sm text-gray-600 mb-2">Username</label>
-              <div className="text-gray-800 py-2 border-b border-gray-300">Username</div>
-            </div>
-            
-            <div>
-              <label className="block text-sm text-gray-600 mb-2">Email</label>
-              <div className="text-gray-800 py-2 border-b border-gray-300">user.email@gmail.com</div>
-            </div>
-          </div>
+          ) : null}
         </div>
 
         {/* Notifications and Data & Device Management */}
