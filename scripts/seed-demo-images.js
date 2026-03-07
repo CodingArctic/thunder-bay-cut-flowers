@@ -23,9 +23,11 @@ const fs = require('fs');
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
-const IMG_W = 400;
-const IMG_H = 300;
-const BAR_H = 24; // value-progress bar strip at bottom of each image
+// 16:9 aspect ratio to match production (1920x1080)
+// Using 960x540 for reasonable file sizes in development
+const IMG_W = 960;
+const IMG_H = 540;
+const BAR_H = 36; // value-progress bar strip at bottom of each image
 
 // Fixed base time used to derive filenames (matches SampleData.sql)
 const BASE = new Date('2026-01-15T10:00:00.000Z');
@@ -34,29 +36,29 @@ const BASE = new Date('2026-01-15T10:00:00.000Z');
 // [monitorID, intervalMinutes, healthScore]
 // Health score: 1.0 = fully healthy, 0.0 = severely stressed/dehydrated
 const RECORDS = [
-    // ── dehydrating_device (monitor 1) – 10-min intervals ──────────────────
-    [1, 180, 0.35],
-    [1, 170, 0.32],
-    [1, 160, 0.28],
-    [1, 150, 0.24],
-    [1, 140, 0.20],
-    [1, 130, 0.17],
-    [1, 120, 0.14],
-    [1, 110, 0.11],
-    [1, 100, 0.09],
-    [1,  90, 0.07],
-    [1,  80, 0.05],
-    [1,  70, 0.04],
-    // ── healthy_device (monitor 2) – 20-min intervals ───────────────────────
-    [2, 180, 0.90],
-    [2, 160, 0.89],
-    [2, 140, 0.91],
-    [2, 120, 0.88],
-    [2, 100, 0.90],
-    [2,  80, 0.92],
-    [2,  60, 0.91],
-    [2,  40, 0.93],
-    [2,  20, 0.94],
+    // ── healthy_device (monitor 1) – 10-min intervals ──────────────────
+    [1, 180, 0.90],
+    [1, 160, 0.89],
+    [1, 140, 0.91],
+    [1, 120, 0.88],
+    [1, 100, 0.90],
+    [1,  80, 0.92],
+    [1,  60, 0.91],
+    [1,  40, 0.93],
+    [1,  20, 0.94],
+    // ── dehydrating_device (monitor 2) – 20-min intervals ───────────────────────
+    [2, 180, 0.35],
+    [2, 170, 0.32],
+    [2, 160, 0.28],
+    [2, 150, 0.24],
+    [2, 140, 0.20],
+    [2, 130, 0.17],
+    [2, 120, 0.14],
+    [2, 110, 0.11],
+    [2, 100, 0.09],
+    [2,  90, 0.07],
+    [2,  80, 0.05],
+    [2,  70, 0.04],
     // ── warning_device (monitor 3) – 20-min intervals ───────────────────────
     [3, 180, 0.58],
     [3, 160, 0.55],
