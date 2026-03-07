@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../utils/api-request';
 
-const radius = 30;
+const radius = 40;
 const circumference = 2 * Math.PI * radius;
 
 // Helper function to get emoji based on health score
@@ -15,7 +15,7 @@ function getHealthEmoji(score: number): string {
 
 export function Data() {
   const [error, setError] = useState('');
-  const [monitorID, setMonitorID] = useState('1');
+  const [monitorID, setMonitorID] = useState('');
   const [monitorOptions, setMonitorOptions] = useState<number[]>([]);
   const [records, setRecords] = useState<any[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
@@ -24,7 +24,12 @@ export function Data() {
     const fetchMonitors = async () => {
       try {
         let response = await apiRequest(`/api/monitors/all`, `GET`) as { monitorIDs: number[] };
-        setMonitorOptions(response.monitorIDs || []);
+        const monitors = response.monitorIDs || [];
+        setMonitorOptions(monitors);
+        // Set the first available monitor as default if not already set
+        if (monitors.length > 0 && !monitorID) {
+          setMonitorID(String(monitors[0]));
+        }
       } catch (error: any) {
         setError(error.message);
       }
@@ -161,8 +166,9 @@ export function Data() {
                       fill="none"
                       stroke="#ff6b6b"
                       strokeWidth="8"
-                      strokeDasharray={`${circumference * progress} ${circumference}`}
+                      strokeDasharray={circumference}
                       strokeDashoffset={circumference * (1 - progress)}
+                      strokeLinecap="butt"
                       transform="rotate(-90 50 50)"
                     />
                     <text x="50" y="58" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">

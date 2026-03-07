@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { apiRequest } from '../utils/api-request';
 
-const radius = 35;
+const radius = 50;
 const circumference = 2 * Math.PI * radius;
 
 // Helper function to get emoji based on health score
@@ -16,7 +16,7 @@ function getHealthEmoji(score: number): string {
 
 export function Dashboard() {
   const [error, setError] = useState('');
-  const [monitorID, setMonitorID] = useState('1');
+  const [monitorID, setMonitorID] = useState('');
   const [monitorOptions, setMonitorOptions] = useState<number[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [latestRecordID, setLatestRecordID] = useState<number | null>(null);
@@ -26,7 +26,12 @@ export function Dashboard() {
     const fetchMonitors = async () => {
       try {
         let response = await apiRequest(`/api/monitors/all`, `GET`) as { monitorIDs: number[] };
-        setMonitorOptions(response.monitorIDs || []);
+        const monitors = response.monitorIDs || [];
+        setMonitorOptions(monitors);
+        // Set the first available monitor as default if not already set
+        if (monitors.length > 0 && !monitorID) {
+          setMonitorID(String(monitors[0]));
+        }
       } catch (error: any) {
         setError(error.message);
       }
@@ -144,8 +149,9 @@ export function Dashboard() {
                       fill="none"
                       stroke="#ff6b6b"
                       strokeWidth="10"
-                      strokeDasharray={`${circumference * latestScore} ${circumference}`}
+                      strokeDasharray={circumference}
                       strokeDashoffset={circumference * (1 - latestScore)}
+                      strokeLinecap="butt"
                       transform="rotate(-90 60 60)"
                     />
                     <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
