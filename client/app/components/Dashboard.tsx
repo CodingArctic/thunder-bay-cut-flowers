@@ -1,24 +1,6 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
-
-const chartData = [
-  { time: '8:00am', value: 82 },
-  { time: '8:15am', value: 88 },
-  { time: '8:30am', value: 79 },
-  { time: '8:45am', value: 85 },
-  { time: '9:00am', value: 92 },
-  { time: '9:15am', value: 86 },
-  { time: '9:30am', value: 0 }
-];
-
-const dataOverview = [
-  { time: '8:00am', value: '0.94' },
-  { time: '8:15am', value: '0.86' },
-  { time: '8:30am', value: '0.91' },
-  { time: '8:45am', value: '0.88' },
-  { time: '9:00am', value: '0.95' },
-  { time: '9:15am', value: '0.82' },
-  { time: '9:30am', value: '0.89' }
-];
+import { useEffect, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
+import { apiRequest } from '../utils/api-request';
 
 const radius = 35;
 const circumference = 2 * Math.PI * radius;
@@ -33,6 +15,48 @@ function getHealthEmoji(score: number): string {
 }
 
 export function Dashboard() {
+  const [error, setError] = useState('');
+  const [monitorID, setMonitorID] = useState('1');
+  const [monitorOptions, setMonitorOptions] = useState<number[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [latestRecordID, setLatestRecordID] = useState<number | null>(null);
+  const [latestScore, setLatestScore] = useState<number>(0);
+
+  useEffect(() => {
+    const fetchMonitors = async () => {
+      try {
+        let response = await apiRequest(`/api/monitors/all`, `GET`) as { monitorIDs: number[] };
+        setMonitorOptions(response.monitorIDs || []);
+      } catch (error: any) {
+        setError(error.message);
+      }
+    };
+    fetchMonitors();
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await apiRequest(`/api/record/recent/${monitorID}`, `GET`);
+        setChartData(Array.isArray(data) ? data : []);
+        // Set the latest record ID and score (last item in the array since API returns oldest first)
+        if (Array.isArray(data) && data.length > 0) {
+          const latestRecord = data[data.length - 1];
+          setLatestRecordID(latestRecord.record_id);
+          setLatestScore(latestRecord.dehydration_score);
+        } else {
+          setLatestRecordID(null);
+          setLatestScore(0);
+        }
+      } catch (error: any) {
+        setError(error.message);
+      }
+    };
+    if (monitorID) {
+      fetchData();
+    }
+  }, [monitorID]);
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-8">
@@ -48,25 +72,50 @@ export function Dashboard() {
           <h2 className="text-lg font-bold text-gray-800 mb-4 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
             LAST HOUR OVERVIEW
           </h2>
+
+          <div className="mb-4">
+            <label htmlFor="monitor-select" className="block text-sm font-medium text-gray-700 mb-2">
+              Select Monitor:
+            </label>
+            <select
+              id="monitor-select"
+              value={monitorID}
+              onChange={(e) => setMonitorID(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
+            >
+              <option value="">-- Select a Monitor --</option>
+              {monitorOptions.map((id) => (
+                <option key={id} value={id}>
+                  Monitor {id}
+                </option>
+              ))}
+            </select>
+          </div>
           
           <div className="mt-6">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0d0d0" />
-                <XAxis dataKey="time" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Bar dataKey="value" fill="#ffa07a" radius={[4, 4, 0, 0]} />
+                <XAxis 
+                  dataKey="time" 
+                  tick={{ fontSize: 11 }} 
+                  tickFormatter={(value) => {
+                    const date = new Date(value);
+                    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  }}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11 }} 
+                  tickFormatter={(value) => `${Math.round(value * 100)}%`}
+                  domain={[0, 1]}
+                />
+                <Tooltip 
+                  formatter={(value: any) => `${Math.round(value * 100)}%`}
+                  labelFormatter={(label) => new Date(label).toLocaleString()}
+                />
+                <Bar dataKey="dehydration_score" fill="#ffa07a" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-
-          <div className="mt-6 space-y-2">
-            {dataOverview.map((item, index) => (
-              <div key={index} className="flex justify-between text-sm">
-                <span className="text-gray-600">{item.time}</span>
-                <span className="text-gray-800 font-medium">{item.value}</span>
-              </div>
-            ))}
           </div>
         </div>
 
