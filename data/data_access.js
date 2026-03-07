@@ -185,7 +185,8 @@ async function getPastRecords(monitorID, limit) {
         return null;
     }
 
-    return records;
+    // Reverse to get chronological order (oldest to newest) for chart display
+    return records.reverse();
 }
 
 /**
@@ -212,6 +213,16 @@ async function userCanAccessMonitor(userID, monitorID) {
     return rows !== null && rows.length > 0;
 }
 
+/**
+ * Get all monitors associated with the specified user
+ * @param {int} userID - The user's ID
+ * @returns {Array} Array of available monitor_id
+ */
+async function getMonitors(userID) {
+    const rows = await getData(`users_monitors`, "monitor_id", { user_id: userID });
+    return rows;
+}
+
 module.exports = {
     addRecord,
     monitorExists,
@@ -220,5 +231,6 @@ module.exports = {
     createUser,
     getPastRecords,
     getRecordById,
-    userCanAccessMonitor
+    userCanAccessMonitor,
+    getMonitors
 };
