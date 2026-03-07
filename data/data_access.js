@@ -175,7 +175,7 @@ async function createUser(email, username, passwordHash) {
 async function getPastRecords(monitorID, limit) {
     const records = await getData(
         `records`,
-        [`record_id`, `monitor_id`, `time`, `value`],
+        [`record_id`, `monitor_id`, `time`, `dehydration_score`],
         { monitor_id: monitorID },
         limit,
         { property: `time`, order: `DESC` }
