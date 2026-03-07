@@ -69,6 +69,10 @@ ALTER TABLE records OWNER TO flowers;
 
 CREATE INDEX idx_records_time ON records(time);
 
+
+-- Create alert_method type
+CREATE TYPE alert_method AS ENUM ('email', 'sms');
+
 -------------------------------------------------
 -- ALERTS
 -------------------------------------------------
@@ -76,7 +80,7 @@ CREATE TABLE alerts (
     alert_id SERIAL PRIMARY KEY,
     record_id INTEGER NOT NULL REFERENCES records(record_id) ON DELETE CASCADE,
     alert_type TEXT NOT NULL,
-    alert_method As enum('email', 'sms') NOT NULL,
+    alert_method alert_method NOT NULL,
     triggered_at TIMESTAMPTZ DEFAULT NOW()
 );
 
