@@ -10,6 +10,7 @@ const express = require(`express`),
   loginRouter = require(`./routes/login`),
   registerRouter = require(`./routes/register`),
   monitorsRouter = require(`./routes/monitors`),
+  userRouter = require(`./routes/user`),
   { requireAuth } = require(`./routes/auth`),
 
   staticDir = path.join(__dirname, `client/out`);
@@ -54,6 +55,7 @@ app.use(`/api/record`, recordRouter);
 
 // Protected API routes (after auth middleware)
 app.use(`/api/monitors`, monitorsRouter);
+app.use(`/api/user`, userRouter);
 
 // Serve static frontend files (after auth middleware)
 app.use(express.static(staticDir, { 
