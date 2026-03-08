@@ -9,6 +9,15 @@ export default function Register() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+    let formatted = digits;
+    if (digits.length > 6)       formatted = `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+    else if (digits.length > 3)  formatted = `(${digits.slice(0,3)}) ${digits.slice(3)}`;
+    else if (digits.length > 0)  formatted = `(${digits}`;
+    setPhoneNumber(formatted);
+  };
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -20,7 +29,7 @@ export default function Register() {
     const trimmedFirstName = firstName.trim();
     const trimmedLastName  = lastName.trim();
     const trimmedEmail     = email.trim();
-    const trimmedPhone     = phoneNumber.trim();
+    const trimmedPhone     = phoneNumber.replace(/\D/g, '');
 
     if (trimmedUsername.length < 8 || password.length < 8) {
       setError('Both username and password must be 8+ characters.');
@@ -107,10 +116,10 @@ export default function Register() {
             <input
               type="tel"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              onChange={handlePhoneChange}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
-              placeholder="585-555-5555"
-              maxLength={20}
+              placeholder="(585) 555-5555"
+              maxLength={14}
             />
           </div>
 

@@ -76,7 +76,9 @@ export function Settings() {
               <div>
                 <label className="block text-sm text-gray-600 mb-2">Phone Number</label>
                 <div className="text-gray-800 py-2 border-b border-gray-300">
-                  {userData.phone_number || 'N/A'}
+                  {userData.phone_number
+                    ? userData.phone_number.replace(/^(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3')
+                    : 'N/A'}
                 </div>
               </div>
             </div>
