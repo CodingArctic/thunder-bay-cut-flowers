@@ -16,7 +16,13 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (username.trim().length < 8 || password.trim().length < 8) {
+    const trimmedUsername  = username.trim();
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName  = lastName.trim();
+    const trimmedEmail     = email.trim();
+    const trimmedPhone     = phoneNumber.trim();
+
+    if (trimmedUsername.length < 8 || password.length < 8) {
       setError('Both username and password must be 8+ characters.');
       return;
     }
@@ -27,12 +33,18 @@ export default function Register() {
     }
 
     try {
-      await apiRequest(`/api/register`, `POST`, { username, password, firstName, lastName, email, phoneNumber });
+      await apiRequest(`/api/register`, `POST`, {
+        username: trimmedUsername,
+        password,
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
+        email: trimmedEmail,
+        phoneNumber: trimmedPhone,
+      });
       window.location.href = '/login';
     } catch (error: any) {
       setError(error.message);
     }
-
   };
 
   return (
@@ -45,7 +57,7 @@ export default function Register() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm text-gray-600 mb-2">
-              First Name
+              First Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -53,13 +65,14 @@ export default function Register() {
               onChange={(e) => setFirstName(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="Jane"
+              maxLength={100}
               required
             />
           </div>
 
           <div>
             <label className="block text-sm text-gray-600 mb-2">
-              Last Name
+              Last Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -67,13 +80,14 @@ export default function Register() {
               onChange={(e) => setLastName(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="Doe"
+              maxLength={100}
               required
             />
           </div>
 
           <div>
             <label className="block text-sm text-gray-600 mb-2">
-              Email
+              Email <span className="text-red-500">*</span>
             </label>
             <input
               type="email"
@@ -81,13 +95,14 @@ export default function Register() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="jane@doe.com"
+              maxLength={254}
               required
             />
           </div>
 
           <div>
             <label className="block text-sm text-gray-600 mb-2">
-              Phone Number
+              Phone Number <span className="text-gray-400">(optional)</span>
             </label>
             <input
               type="tel"
@@ -95,13 +110,13 @@ export default function Register() {
               onChange={(e) => setPhoneNumber(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="585-555-5555"
-              required
+              maxLength={20}
             />
           </div>
 
           <div>
             <label className="block text-sm text-gray-600 mb-2">
-              Username
+              Username <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -109,13 +124,14 @@ export default function Register() {
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="jane_doe"
+              maxLength={50}
               required
             />
           </div>
 
           <div>
             <label className="block text-sm text-gray-600 mb-2">
-              Password
+              Password <span className="text-red-500">*</span>
             </label>
             <input
               type="password"
@@ -123,13 +139,14 @@ export default function Register() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="Create a password"
+              maxLength={128}
               required
             />
           </div>
 
           <div>
             <label className="block text-sm text-gray-600 mb-2">
-              Confirm Password
+              Confirm Password <span className="text-red-500">*</span>
             </label>
             <input
               type="password"
@@ -137,6 +154,7 @@ export default function Register() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="Confirm password"
+              maxLength={128}
               required
             />
           </div>
