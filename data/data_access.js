@@ -183,12 +183,18 @@ async function getUserById(userId) {
  * @returns {Object|null}
  */
 
-async function createUser(email, username, passwordHash) {
-    return await insertData("users", {
+async function createUser(email, username, passwordHash, firstName, lastName, phoneNumber) {
+    const data = {
         email: email,
         username: username,
-        password: passwordHash
-    });
+        password: passwordHash,
+        first_name: firstName,
+        last_name: lastName,
+    };
+    if (phoneNumber) {
+        data.phone_number = phoneNumber;
+    }
+    return await insertData("users", data);
 }
 
 async function getPastRecords(monitorID, limit) {
@@ -238,7 +244,13 @@ async function userCanAccessMonitor(userID, monitorID) {
  * @returns {Array} Array of available monitor_id
  */
 async function getMonitors(userID) {
-    const rows = await getData(`users_monitors`, "monitor_id", { user_id: userID });
+    const rows = await getData(
+        `users_monitors`,
+        "monitor_id",
+        { user_id: userID },
+        0,
+        { property: `monitor_id`, order: `ASC`}
+    );
     return rows;
 }
 

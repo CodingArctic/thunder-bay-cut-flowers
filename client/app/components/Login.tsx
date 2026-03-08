@@ -13,12 +13,13 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (username.trim().length < 8 || password.trim().length < 8) {
+    const trimmedUsername = username.trim();
+    if (trimmedUsername.length < 8 || password.length < 8) {
       setError('Both username and password must be 8+ characters.');
       return;
     }
     try {
-      await apiRequest(`/api/login`, `POST`, { username, password });
+      await apiRequest(`/api/login`, `POST`, { username: trimmedUsername, password });
       router.push('/');
     } catch (error: any) {
       setError(error.message);
@@ -40,6 +41,7 @@ export default function Login() {
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="jane_doe"
+              maxLength={50}
               required
             />
           </div>
@@ -52,6 +54,7 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border-b-2 border-gray-300 focus:border-gray-600 text-gray-500 outline-none transition bg-transparent"
               placeholder="s3curePasswordWow!"
+              maxLength={128}
               required
             />
           </div>

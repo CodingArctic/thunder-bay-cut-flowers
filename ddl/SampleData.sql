@@ -11,11 +11,11 @@ TRUNCATE TABLE alerts, records, users_monitors, monitors, users RESTART IDENTITY
 INSERT INTO users (email, username, password, first_name, last_name, phone_number) VALUES
 ('grower1@farm.com', 'green_valley',
  '$2a$12$oYYHWhjYpM7HDEJEbXWeAu0dNKK1rixiofSKeLLBPAmL1REkJSvSO',
- 'John', 'Valley', '585-555-1111'),
+ 'John', 'Valley', '5855551111'),
 
 ('grower2@farm.com', 'sunrise_farms',
  '$2a$12$PwkVHXfBQG74SH622qiIUeWDXC9BeTX2ZGtZZ0WX1zCZnERbdzOry',
- 'Emma', 'Sunrise', '585-555-2222');
+ 'Emma', 'Sunrise', '5855552222');
 
 -------------------------------------------------
 -- MONITORS

@@ -2,8 +2,15 @@ const jwt = require("jsonwebtoken");
 const { loadEnvFile } = require('node:process');
 loadEnvFile();
 
-// Secure random key stored in .env file
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_key";
+// Secure random key — must be set via environment variable
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    if (process.env.ENVIRONMENT === "prod") {
+        throw new Error("FATAL: JWT_SECRET environment variable is not set. Refusing to start in production.");
+    }
+    console.warn("[auth] WARNING: JWT_SECRET is not set. Using insecure fallback — do NOT deploy to production.");
+}
+const SECRET = JWT_SECRET || "dev_secret_key";
 
 /*
     Create a signed JWT token for a user after login
@@ -14,7 +21,7 @@ function signToken(user) {
             user_id: user.user_id,
             username: user.username
         },
-        JWT_SECRET,
+        SECRET,
         { expiresIn: "7d" } // token valid for 7 days
     );
 }
@@ -40,7 +47,7 @@ function requireAuth(req, res, next) {
             }
         }
 
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, SECRET);
 
         // attach user info to request for later routes
         req.user = decoded;

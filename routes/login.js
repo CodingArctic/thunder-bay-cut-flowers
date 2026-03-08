@@ -22,6 +22,13 @@ router.post("/", async (req, res) => {
 
         let { username, password } = req.body;
 
+        username = username.trim();
+
+        // Prevent bcrypt DoS via excessively long passwords
+        if (password.length > 128) {
+            return res.status(401).json({ error: "Invalid username or password" });
+        }
+
         // Get user from database
         const user = await db.getUserByUsername(username);
 
