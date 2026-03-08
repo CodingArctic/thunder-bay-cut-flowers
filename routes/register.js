@@ -17,6 +17,8 @@ router.post("/", async (req, res) => {
         const trimmedFirst    = (firstName   || '').trim();
         const trimmedLast     = (lastName    || '').trim();
         const trimmedPhone    = (phoneNumber || '').trim();
+        // Store digits only — easy to convert to E.164 later, no formatting opinion baked in
+        const normalizedPhone = trimmedPhone ? trimmedPhone.replace(/\D/g, '') : null;
 
         if (!trimmedEmail || !trimmedUsername || !password || !trimmedFirst || !trimmedLast) {
             return res.status(400).json({ error: "First name, last name, email, username, and password are required" });
@@ -59,7 +61,7 @@ router.post("/", async (req, res) => {
         const passwordHash = await bcrypt.hash(password, salt);
 
         // Insert new user
-        const newUser = await db.createUser(trimmedEmail, trimmedUsername, passwordHash, trimmedFirst, trimmedLast, trimmedPhone || null);
+        const newUser = await db.createUser(trimmedEmail, trimmedUsername, passwordHash, trimmedFirst, trimmedLast, normalizedPhone);
 
         if (!newUser) {
             return res.status(500).json({ error: "Failed to create user" });
