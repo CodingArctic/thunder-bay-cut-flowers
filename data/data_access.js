@@ -244,7 +244,13 @@ async function userCanAccessMonitor(userID, monitorID) {
  * @returns {Array} Array of available monitor_id
  */
 async function getMonitors(userID) {
-    const rows = await getData(`users_monitors`, "monitor_id", { user_id: userID });
+    const rows = await getData(
+        `users_monitors`,
+        "monitor_id",
+        { user_id: userID },
+        0,
+        { property: `monitor_id`, order: `ASC`}
+    );
     return rows;
 }
 
