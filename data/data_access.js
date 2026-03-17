@@ -100,7 +100,7 @@ async function addRecord(monitorID, value, imgName) {
     let newRecord = await insertData(`records`, {
         monitor_id: monitorID,
         time: new Date(),
-        value: value,
+        dehydration_score: value,
         file_path: `/imgs/${monitorID}/${imgName}`
     });
     if (!newRecord) {
