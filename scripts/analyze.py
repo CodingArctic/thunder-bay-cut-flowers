@@ -1,6 +1,7 @@
 import sys
 import json
 import os
+import shutil
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ComputerVision import PlantHealthCV
@@ -60,8 +61,14 @@ def analyze(image_path):
     worst = min(plant_zones, key=lambda r: r["value"]) if plant_zones else None
 
     overview_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captures")
+    if os.path.exists(overview_dir):
+        shutil.rmtree(overview_dir)
+    os.makedirs(overview_dir)
+
     overview_files = sorted([f for f in os.listdir(overview_dir) if f.startswith("overview_")])
     overview_path = os.path.join(overview_dir, overview_files[-1]) if overview_files else image_path
+
+    
 
     llm_score = run_gemini(
         overview_path if os.path.exists(overview_path) else image_path,
