@@ -6,6 +6,7 @@ const express = require(`express`),
     db = require(`../data/data_access`),
     fs = require('fs');
 
+const { analyzeImage } = require('../scripts/cv_analyze.js');
 /*
     TODO:
     - check an API key to ensure request is from an authorized device
@@ -47,7 +48,10 @@ router.post(`/:monitorID`, async (req, res) => {
             } 
         });
 
-        let insertedRecord = await db.addRecord(monitorID, 0.98, imageName);
+        const analysis = await analyzeImage(imagePath);
+        const score = (analysis && analysis.score !== undefined) ? analysis.score : 0.0;
+
+        let insertedRecord = await db.addRecord(monitorID, score, imageName);
         if (!insertedRecord) {
             return res.status(500).json({ "error": "Failed to insert record into database" });
         }
