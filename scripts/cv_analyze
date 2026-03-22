@@ -3,7 +3,7 @@ const { execFile } = require('child_process');
 const path = require('path');
  
 const PYTHON_PATH = process.env.PYTHON_PATH || 'python3';
-const CV_SCRIPT = path.join(__dirname, '..', 'ml', 'analyze.py');
+const CV_SCRIPT = path.join(__dirname, '..', 'scripts', 'analyze.py');
  
 /**
  * Run CV + optional Gemini analysis on an image.
