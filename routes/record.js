@@ -41,12 +41,12 @@ router.post(`/:monitorID`, async (req, res) => {
             fs.mkdirSync(uploadPath);
         }
 
-        uploadedFile.mv(imagePath, (err) => {
-            if (err) {
-                console.log(err);
-                return res.status(500).json({ "error": "Failed to upload image" });
-            } 
-        });
+        try {
+            await uploadedFile.mv(imagePath);
+        } catch (err) {
+            console.log(err);
+            return res.status(500).json({ "error": "Failed to upload image" });
+        }
 
         const analysis = await analyzeImage(imagePath);
         const score = (analysis && analysis.score !== undefined) ? analysis.score : 0.0;
