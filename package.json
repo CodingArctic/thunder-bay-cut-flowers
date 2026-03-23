@@ -1,6 +1,7 @@
 {
   "name": "thunder-bay-cut-flowers",
   "scripts": {
+    "start": "node ./bin/www",
     "seed-images": "node scripts/seed-demo-images.js"
   },
   "dependencies": {
