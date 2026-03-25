@@ -10,7 +10,6 @@ const { analyzeImage } = require('../scripts/cv_analyze.js');
 /*
     TODO:
     - check an API key to ensure request is from an authorized device
-    - add the call to ML model to process image and save decimal value to DB
 */
 
 router.post(`/:monitorID`, async (req, res) => {
@@ -48,15 +47,35 @@ router.post(`/:monitorID`, async (req, res) => {
             return res.status(500).json({ "error": "Failed to upload image" });
         }
 
-        const analysis = await analyzeImage(imagePath);
-        const score = (analysis && analysis.score !== undefined) ? analysis.score : 0.0;
+        // Return immediately after upload so device requests are not blocked by analysis latency.
+        res.status(200).json({ "success": true });
 
-        let insertedRecord = await db.addRecord(monitorID, score, imageName);
-        if (!insertedRecord) {
-            return res.status(500).json({ "error": "Failed to insert record into database" });
-        }
-    
-        return res.status(200).json({ "success": true });
+        (async () => {
+            try {
+                const analysis = await analyzeImage(imagePath);
+                const score = (analysis && analysis.score !== undefined) ? analysis.score : 0.0;
+
+                let insertedRecord = await db.addRecord(monitorID, score, imageName);
+                if (!insertedRecord) {
+                    console.error(`Failed to insert record into database`, { monitorID, imageName });
+                }
+
+                console.info(`Background analysis summary`, {
+                    monitorID,
+                    imageName,
+                    cvSucceeded: analysis !== null,
+                    geminiUsed: Boolean(analysis && analysis.llm_used),
+                    cvScore: analysis ? analysis.cv_score : null,
+                    geminiScore: analysis ? analysis.llm_score : null,
+                    combinedScore: score,
+                    dbInsertSucceeded: Boolean(insertedRecord),
+                });
+            } catch (err) {
+                console.error(`Background image analysis failed`, { monitorID, imageName, error: err });
+            }
+        })();
+
+        return;
         
     } else {
         return res.status(400).json({ "error": "An image was not sent" });
