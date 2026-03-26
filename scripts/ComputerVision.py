@@ -149,6 +149,7 @@ class CVScorer:
         b = color_ratios["brown"]
         y = color_ratios["yellow"]
         pigment = color_ratios["pigment"]  
+        gq = color_ratios["green_quality"]
         plant_coverage = pigment + b + y   
 
         if plant_coverage < 0.20:
@@ -164,6 +165,7 @@ class CVScorer:
 
         score = (
             pigment_score * 0.45 +
+            gq * 0.25 +
             (1.0 - brown_penalty) * 0.25 +
             (1.0 - yellow_penalty) * 0.10 +
             coverage_score * 0.20
@@ -189,6 +191,7 @@ class CVScorer:
         """Build details dict for a scored zone."""
         details = {
             "green_pct": round(cur["green"] * 100, 1),
+            "green_quality_pct": round(cur["green_quality"] * 100, 1),
             "red_pct": round(cur["red"] * 100, 1),
             "magenta_pct": round(cur["magenta"] * 100, 1),
             "purple_pct": round(cur["purple"] * 100, 1),
@@ -222,7 +225,8 @@ class CVScorer:
 
     def _color_ratios(self, hsv):
         t = hsv.shape[0] * hsv.shape[1]
-        g = np.sum(cv2.inRange(hsv, np.array([25, 40, 40]), np.array([85, 255, 255])) > 0) / t
+        green_mask = cv2.inRange(hsv, np.array([25, 40, 40]), np.array([85, 255, 255]))
+        g = np.sum(green_mask > 0) / t
         purple = np.sum(cv2.inRange(hsv, np.array([120, 30, 30]), np.array([140, 255, 255])) > 0) / t
         magenta = np.sum(cv2.inRange(hsv, np.array([140, 40, 40]), np.array([160, 255, 255])) > 0) / t
         red_hi = np.sum(cv2.inRange(hsv, np.array([160, 50, 40]), np.array([180, 255, 255])) > 0) / t
@@ -234,10 +238,18 @@ class CVScorer:
 
         pigment = g + red_lo + red_hi + magenta + purple
 
+        green_quality = 1.0
+        green_pixels = hsv[green_mask > 0]
+        if len(green_pixels) > 100:
+            saturation_mean = np.mean(green_pixels[:, 1] >= 45) / len(green_pixels)
+            value_mean = np.mean(green_pixels[:, 2] >= 100) / len(green_pixels)
+            green_quality = (saturation_mean * 0.5 + value_mean * 0.5)
+            
         return {
             "green": g, "brown": b, "yellow": y,
             "red": red_lo + red_hi, "magenta": magenta, "purple": purple,
             "pigment": pigment,
+            "green_quality": green_quality,
         }
 
     def _hist_sim(self, h1, h2):

@@ -4,7 +4,12 @@ import os
 import shutil
 import re
 from pathlib import Path
-
+"Backup models in event a call gets rate limted"
+GEMINI_MODELS = [
+    "gemini-3.1-flash-lite-preview",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+]
 
 def check_dependencies():
     """Check for required packages and provide setup instructions if missing."""
@@ -103,28 +108,29 @@ The computer vision system scored the overall health at {cv_score:.2f} (0=dead, 
 
 Based on what you see in the image, provide your own health score from 0.00 to 1.00.
 Respond with ONLY a decimal number, nothing else. Example: 0.73"""
+    for model in GEMINI_MODELS:
+        try:
+            img = PIL.Image.open(image_path)
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=[prompt, img],
+                config=types.GenerateContentConfig(
+                    temperature=0.2,
+                    max_output_tokens=10,
+                ),
+            )
 
-    try:
-        img = PIL.Image.open(image_path)
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=[prompt, img],
-            config=types.GenerateContentConfig(
-                temperature=0.2,
-                max_output_tokens=10,
-            ),
-        )
+            text = (response.text or "").strip()
+            value, parse_mode = parse_score(text)
+            if value is None:
+                print(f"Warning: Gemini response could not be parsed as score. Raw text: {text}", file=sys.stderr)
+                return None, "parse_error", text
 
-        text = (response.text or "").strip()
-        value, parse_mode = parse_score(text)
-        if value is None:
-            print(f"Warning: Gemini response could not be parsed as score. Raw text: {text}", file=sys.stderr)
-            return None, "parse_error", text
-
-        return value, f"ok_{parse_mode}", text
-    except Exception as e:
-        print(f"Error calling Gemini API: {e}", file=sys.stderr)
-        return None, "request_error", None
+            return value, f"ok_{parse_mode}", text
+        except Exception as e:
+            print(f"Error calling Gemini API: {e}", file=sys.stderr)
+            continue
+    return None, "all_models_failed", None
 
 
 def analyze(image_path):
