@@ -67,7 +67,7 @@ export function Data() {
         <h1 className="text-2xl font-bold text-gray-800">DATA</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 ">
         {/* Data Overview */}
         <div className="space-y-6">
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
@@ -121,7 +121,47 @@ export function Data() {
         </div>
 
         {/* Photo and Health Score */}
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Overall Flower Health */}
+          <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
+            <h2 className="text-sm font-bold text-gray-800 mb-4 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
+              FLOWER HEALTH AT SELECTED TIME
+            </h2>
+            
+            <div className="bg-[#ffe4b8] rounded-lg p-6 text-center mt-4">
+              <div className="text-6xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
+              <div className="flex items-center justify-center">
+                <div className="relative">
+                  <svg width="120" height="120" viewBox="0 0 120 120">
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="#ffd9a3"
+                      strokeWidth="10"
+                    />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="#ff6b6b"
+                      strokeWidth="10"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={circumference * (1 - progress)}
+                      strokeLinecap="butt"
+                      transform="rotate(-90 60 60)"
+                    />
+                    <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
+                      {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : '0%'}
+                    </text>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Photo from Image/VIDEO Folder */}
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
             <h2 className="text-sm font-bold text-gray-800 mb-3 bg-[#ffd9a3] inline-block px-3 py-1 rounded">
@@ -138,46 +178,6 @@ export function Data() {
                 <span className="text-gray-500">No photo available</span>
               </div>
             )}
-          </div>
-
-          {/* Overall Flower Health */}
-          <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
-            <h2 className="text-sm font-bold text-gray-800 mb-4 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
-              FLOWER HEALTH AT SELECTED TIME
-            </h2>
-            
-            <div className="bg-[#ffe4b8] rounded-lg p-6 text-center mt-4">
-              <div className="text-5xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
-              <div className="flex items-center justify-center">
-                <div className="relative">
-                  <svg width="100" height="100" viewBox="0 0 100 100">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="#ffd9a3"
-                      strokeWidth="8"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="#ff6b6b"
-                      strokeWidth="8"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={circumference * (1 - progress)}
-                      strokeLinecap="butt"
-                      transform="rotate(-90 50 50)"
-                    />
-                    <text x="50" y="58" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">
-                      {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : '0%'}
-                    </text>
-                  </svg>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

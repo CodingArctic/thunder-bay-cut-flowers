@@ -71,7 +71,7 @@ export function Dashboard() {
         <h1 className="text-2xl font-bold text-gray-800">DASHBOARD</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Last Hour Overview */}
         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
@@ -125,7 +125,7 @@ export function Dashboard() {
         </div>
 
         {/* Current Health Message */}
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
             <h2 className="text-lg font-bold text-gray-800 mb-6">CURRENT HEALTH MESSAGE</h2>
 
