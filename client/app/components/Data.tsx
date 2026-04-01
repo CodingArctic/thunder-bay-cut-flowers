@@ -123,6 +123,7 @@ export function Data() {
         {/* Photo and Health Score */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           
+
           {/* Overall Flower Health */}
           <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
             <h2 className="text-sm font-bold text-gray-800 mb-4 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
@@ -133,28 +134,28 @@ export function Data() {
               <div className="text-6xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
               <div className="flex items-center justify-center">
                 <div className="relative">
-                  <svg width="120" height="120" viewBox="0 0 120 120">
+                  <svg width="100" height="100" viewBox="0 0 100 100">
                     <circle
-                      cx="60"
-                      cy="60"
-                      r="50"
+                      cx="50"
+                      cy="50"
+                      r="40"
                       fill="none"
                       stroke="#ffd9a3"
-                      strokeWidth="10"
+                      strokeWidth="8"
                     />
                     <circle
-                      cx="60"
-                      cy="60"
-                      r="50"
+                      cx="50"
+                      cy="50"
+                      r="40"
                       fill="none"
                       stroke="#ff6b6b"
-                      strokeWidth="10"
+                      strokeWidth="8"
                       strokeDasharray={circumference}
                       strokeDashoffset={circumference * (1 - progress)}
                       strokeLinecap="butt"
-                      transform="rotate(-90 60 60)"
+                      transform="rotate(-90 50 50)"
                     />
-                    <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
+                    <text x="50" y="58" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">
                       {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : '0%'}
                     </text>
                   </svg>
