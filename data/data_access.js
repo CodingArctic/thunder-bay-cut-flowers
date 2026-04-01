@@ -254,6 +254,29 @@ async function getMonitors(userID) {
     return rows;
 }
 
+/**
+ * Get distinct user email addresses associated with a monitor
+ * @param {int} monitorID - The monitor ID
+ * @returns {Array<string>} Array of email addresses
+ */
+async function getMonitorUserEmails(monitorID) {
+    const text = `
+        SELECT DISTINCT u.email
+        FROM users u
+        INNER JOIN users_monitors um ON um.user_id = u.user_id
+        WHERE um.monitor_id = $1
+        ORDER BY u.email ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID]);
+        return rows.map(r => r.email);
+    } catch (err) {
+        console.error("getMonitorUserEmails error:", err);
+        return [];
+    }
+}
+
 module.exports = {
     addRecord,
     monitorExists,
@@ -264,5 +287,6 @@ module.exports = {
     getPastRecords,
     getRecordById,
     userCanAccessMonitor,
-    getMonitors
+    getMonitors,
+    getMonitorUserEmails
 };
