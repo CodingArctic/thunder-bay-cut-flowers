@@ -1,8 +1,11 @@
 import json
 import os
+import tempfile
+import time
 from datetime import datetime
 
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trend_history.json")
+LOCK_FILE = f"{HISTORY_FILE}.lock"
 MAX_ENTRIES = 240 # Assuming 6 entry per hour, this keeps at least 4 days of history per zone
 
 
@@ -17,37 +20,66 @@ def _load_history():
 
 
 def _save_history(history):
-    with open(HISTORY_FILE, "w") as f:
-        json.dump(history, f, indent=2)
+    tmp_fd, tmp_path = tempfile.mkstemp(prefix="trend_history_", suffix=".tmp", dir=os.path.dirname(HISTORY_FILE))
+    try:
+        with os.fdopen(tmp_fd, "w") as f:
+            json.dump(history, f, indent=2)
+        os.replace(tmp_path, HISTORY_FILE)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+def _acquire_history_lock(timeout_seconds=5.0, poll_interval_seconds=0.05):
+    start = time.time()
+    while True:
+        try:
+            return os.open(LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+        except FileExistsError:
+            if time.time() - start >= timeout_seconds:
+                raise TimeoutError("Timed out waiting for trend history lock")
+            time.sleep(poll_interval_seconds)
+
+
+def _release_history_lock(lock_fd):
+    try:
+        os.close(lock_fd)
+    finally:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
 
 
 def record(zone_results):
     """Record per-zone color values and scores from a single analysis run."""
-    history = _load_history()
-    timestamp = datetime.now().isoformat()
+    lock_fd = _acquire_history_lock()
+    try:
+        history = _load_history()
+        timestamp = datetime.now().isoformat()
 
-    for r in zone_results:
-        zone_id = r["zone_id"]
-        if zone_id not in history:
-            history[zone_id] = []
+        for r in zone_results:
+            zone_id = r["zone_id"]
+            if zone_id not in history:
+                history[zone_id] = []
 
-        entry = {
-            "time": timestamp,
-            "score": r["value"],
-            "category": r["category"],
-            "green_pct": r["cv_details"]["green_pct"],
-            "brown_pct": r["cv_details"]["brown_pct"],
-            "yellow_pct": r["cv_details"]["yellow_pct"],
-            "pigment_pct": r["cv_details"]["pigment_pct"],
-        }
-        history[zone_id].append(entry)
+            entry = {
+                "time": timestamp,
+                "score": r["value"],
+                "category": r["category"],
+                "green_pct": r["cv_details"]["green_pct"],
+                "brown_pct": r["cv_details"]["brown_pct"],
+                "yellow_pct": r["cv_details"]["yellow_pct"],
+                "pigment_pct": r["cv_details"]["pigment_pct"],
+            }
+            history[zone_id].append(entry)
 
-        # Keep only the last MAX_ENTRIES
-        if len(history[zone_id]) > MAX_ENTRIES:
-            history[zone_id] = history[zone_id][-MAX_ENTRIES:]
+            # Keep only the last MAX_ENTRIES
+            if len(history[zone_id]) > MAX_ENTRIES:
+                history[zone_id] = history[zone_id][-MAX_ENTRIES:]
 
-    _save_history(history)
-    return history
+        _save_history(history)
+        return history
+    finally:
+        _release_history_lock(lock_fd)
 
 
 def analyze_trends(zone_results, min_entries=3):
