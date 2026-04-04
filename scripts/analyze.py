@@ -59,6 +59,7 @@ except Exception as e:
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ComputerVision import PlantHealthCV
+from trend_tracker import record, analyze_trends, get_zone_adjustments
 
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 
@@ -66,6 +67,9 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 def run_cv(image_path):
     save_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captures")
     pipeline = PlantHealthCV(rows=2, cols=3, save_dir=save_dir)
+    # Load trend-based severity adjustments so the CV scorer adapts per-zone
+    adjustments = get_zone_adjustments()
+    pipeline.cv.set_zone_adjustments(adjustments)
     return pipeline.process_frame(image_path)
 
 
@@ -87,7 +91,7 @@ def parse_score(text):
         return None, "none"
 
 
-def run_gemini(image_path, cv_score):
+def run_gemini(image_path):
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         print("Warning: GEMINI_API_KEY not set in .env file", file=sys.stderr)
@@ -103,16 +107,16 @@ def run_gemini(image_path, cv_score):
 
     client = genai.Client(api_key=api_key)
 
-    prompt = f"""You are a plant health analyst. Look at this greenhouse image.
-The computer vision system scored the overall health at {cv_score:.2f} (0=dead, 1=perfect).
+    prompt = """You are a plant health analyst. Look at this greenhouse image carefully.
+Check for any signs of dead, brown, or wilting leaves, disease spots, discoloration, or other health issues.
 
-Based on what you see in the image, provide your own health score from 0.00 to 1.00.
+Based on what you see in the image, provide a health score from 0.00 to 1.00 (0=dead, 1=perfect).
 Respond with ONLY a decimal number, nothing else. Example: 0.73"""
     for model in GEMINI_MODELS:
         try:
             img = PIL.Image.open(image_path)
             response = client.models.generate_content(
-                model=GEMINI_MODEL,
+                model=model,
                 contents=[prompt, img],
                 config=types.GenerateContentConfig(
                     temperature=0.2,
@@ -137,7 +141,19 @@ def analyze(image_path):
     results = run_cv(image_path)
 
     plant_zones = [r for r in results if r["category"] != "no_plant"]
-    cv_score = float(round(sum(r["value"] for r in plant_zones) / len(plant_zones), 4)) if plant_zones else 0.0
+    if plant_zones:
+        avg_score = sum(r["value"] for r in plant_zones) / len(plant_zones)
+        worst_score = min(r["value"] for r in plant_zones)
+        # Blend average with worst zone so localized problems aren't hidden
+        cv_score = avg_score * 0.5 + worst_score * 0.5
+        # Extra penalty for each unhealthy zone (score < 0.75)
+        unhealthy = [r for r in plant_zones if r["value"] < 0.75]
+        if unhealthy:
+            penalty = len(unhealthy) / len(plant_zones) * 0.20
+            cv_score = max(0.0, cv_score - penalty)
+        cv_score = float(round(cv_score, 4))
+    else:
+        cv_score = 0.0
     worst = min(plant_zones, key=lambda r: r["value"]) if plant_zones else None
 
     overview_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captures")
@@ -148,16 +164,23 @@ def analyze(image_path):
 
     # Send to Gemini (use overview if available, otherwise use original image)
     image_to_analyze = overview_path if os.path.exists(overview_path) else image_path
-    llm_score, llm_status, llm_raw = run_gemini(image_to_analyze, cv_score)
+    llm_score, llm_status, llm_raw = run_gemini(image_to_analyze)
 
     # Clean up captures folder after we're done using it
     if os.path.exists(overview_dir):
         shutil.rmtree(overview_dir)
 
+    # Record this run and check for declining trends
+    record(results)
+    trend_data = analyze_trends(results)
+    trend_penalty = trend_data["trend_penalty"]
+
     if llm_score is not None:
-        final_score = float(round(cv_score * 0.6 + llm_score * 0.4, 4))
+        combined = float(round(cv_score * 0.6 + llm_score * 0.4, 4))
     else:
-        final_score = cv_score
+        combined = cv_score
+
+    final_score = float(round(max(0.0, combined - trend_penalty), 4))
 
     return {
         "score": final_score,
@@ -167,6 +190,9 @@ def analyze(image_path):
         "llm_status": llm_status,
         "llm_model": GEMINI_MODEL,
         "llm_raw": llm_raw,
+        "trend_penalty": trend_penalty,
+        "declining_zones": trend_data["declining_zones"],
+        "zone_trends": trend_data["zone_trends"],
     }
 
 
