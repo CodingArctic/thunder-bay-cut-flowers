@@ -86,7 +86,7 @@ export function Dashboard() {
               id="monitor-select"
               value={monitorID}
               onChange={(e) => setMonitorID(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
+              className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
             >
               <option value="">-- Select a Monitor --</option>
               {monitorOptions.map((id) => (
