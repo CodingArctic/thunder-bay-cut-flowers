@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import re
+import tempfile
 from pathlib import Path
 "Backup models in event a call gets rate limted"
 GEMINI_MODELS = [
@@ -65,12 +66,15 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 
 
 def run_cv(image_path):
-    save_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captures")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    captures_root = os.path.join(script_dir, "captures")
+    os.makedirs(captures_root, exist_ok=True)
+    save_dir = tempfile.mkdtemp(prefix="run_", dir=captures_root)
     pipeline = PlantHealthCV(rows=2, cols=3, save_dir=save_dir)
     # Load trend-based severity adjustments so the CV scorer adapts per-zone
     adjustments = get_zone_adjustments()
     pipeline.cv.set_zone_adjustments(adjustments)
-    return pipeline.process_frame(image_path)
+    return pipeline.process_frame(image_path), save_dir
 
 
 def parse_score(text):
@@ -95,7 +99,7 @@ def run_gemini(image_path):
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         print("Warning: GEMINI_API_KEY not set in .env file", file=sys.stderr)
-        return None, "missing_api_key", None
+        return None, "missing_api_key", None, None
 
     try:
         from google import genai
@@ -103,7 +107,7 @@ def run_gemini(image_path):
         import PIL.Image
     except ImportError as e:
         print(f"Error: Failed to import required libraries: {e}", file=sys.stderr)
-        return None, "import_error", None
+        return None, "import_error", None, None
 
     client = genai.Client(api_key=api_key)
 
@@ -112,6 +116,8 @@ Check for any signs of dead, brown, or wilting leaves, disease spots, discolorat
 
 Based on what you see in the image, provide a health score from 0.00 to 1.00 (0=dead, 1=perfect).
 Respond with ONLY a decimal number, nothing else. Example: 0.73"""
+    last_status = "all_models_failed"
+    last_raw = None
     for model in GEMINI_MODELS:
         try:
             img = PIL.Image.open(image_path)
@@ -127,18 +133,21 @@ Respond with ONLY a decimal number, nothing else. Example: 0.73"""
             text = (response.text or "").strip()
             value, parse_mode = parse_score(text)
             if value is None:
-                print(f"Warning: Gemini response could not be parsed as score. Raw text: {text}", file=sys.stderr)
-                return None, "parse_error", text
+                print(f"Warning: Gemini response from model {model} could not be parsed as score. Raw text: {text}", file=sys.stderr)
+                last_status = "parse_error"
+                last_raw = text
+                continue
 
-            return value, f"ok_{parse_mode}", text
+            return value, f"ok_{parse_mode}", text, model
         except Exception as e:
-            print(f"Error calling Gemini API: {e}", file=sys.stderr)
+            print(f"Error calling Gemini API with model {model}: {e}", file=sys.stderr)
+            last_status = "request_error"
             continue
-    return None, "all_models_failed", None
+    return None, last_status, last_raw, None
 
 
 def analyze(image_path):
-    results = run_cv(image_path)
+    results, capture_dir = run_cv(image_path)
 
     plant_zones = [r for r in results if r["category"] != "no_plant"]
     if plant_zones:
@@ -156,23 +165,34 @@ def analyze(image_path):
         cv_score = 0.0
     worst = min(plant_zones, key=lambda r: r["value"]) if plant_zones else None
 
-    overview_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captures")
-    
-    # Find the overview image BEFORE cleaning up
-    overview_files = sorted([f for f in os.listdir(overview_dir) if f.startswith("overview_")]) if os.path.exists(overview_dir) else []
-    overview_path = os.path.join(overview_dir, overview_files[-1]) if overview_files else image_path
+    overview_dir = capture_dir
 
-    # Send to Gemini (use overview if available, otherwise use original image)
-    image_to_analyze = overview_path if os.path.exists(overview_path) else image_path
-    llm_score, llm_status, llm_raw = run_gemini(image_to_analyze)
+    # Defaults keep scoring stable if trend persistence is temporarily unavailable.
+    trend_data = {
+        "trend_penalty": 0.0,
+        "declining_zones": 0,
+        "zone_trends": {},
+    }
 
-    # Clean up captures folder after we're done using it
-    if os.path.exists(overview_dir):
-        shutil.rmtree(overview_dir)
+    try:
+        # Find the overview image for this run only.
+        overview_files = sorted([f for f in os.listdir(overview_dir) if f.startswith("overview_")]) if os.path.exists(overview_dir) else []
+        overview_path = os.path.join(overview_dir, overview_files[-1]) if overview_files else image_path
 
-    # Record this run and check for declining trends
-    record(results)
-    trend_data = analyze_trends(results)
+        # Send to Gemini (use overview if available, otherwise use original image)
+        image_to_analyze = overview_path if os.path.exists(overview_path) else image_path
+        llm_score, llm_status, llm_raw, llm_model_used = run_gemini(image_to_analyze)
+
+        # Record this run and check for declining trends
+        try:
+            record(results)
+            trend_data = analyze_trends(results)
+        except Exception as e:
+            print(f"Warning: trend tracking unavailable: {e}", file=sys.stderr)
+    finally:
+        if os.path.exists(overview_dir):
+            shutil.rmtree(overview_dir, ignore_errors=True)
+
     trend_penalty = trend_data["trend_penalty"]
 
     if llm_score is not None:
@@ -188,7 +208,7 @@ def analyze(image_path):
         "llm_score": llm_score,
         "llm_used": llm_score is not None,
         "llm_status": llm_status,
-        "llm_model": GEMINI_MODEL,
+        "llm_model": llm_model_used,
         "llm_raw": llm_raw,
         "trend_penalty": trend_penalty,
         "declining_zones": trend_data["declining_zones"],
