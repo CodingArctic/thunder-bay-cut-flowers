@@ -322,6 +322,31 @@ async function getMonitors(userID) {
 }
 
 /**
+ * Associate a user with a monitor if not already linked
+ * @param {int} userID - The user's ID
+ * @param {int} monitorID - The monitor's ID
+ * @returns {{ created: boolean } | null} Result object or null on error
+ */
+async function associateUserToMonitor(userID, monitorID) {
+    const text = `
+        INSERT INTO users_monitors (user_id, monitor_id)
+        VALUES ($1, $2)
+        ON CONFLICT (monitor_id, user_id) DO NOTHING
+        RETURNING monitor_id;
+    `;
+
+    try {
+        const result = await pool.query(text, [userID, monitorID]);
+        return {
+            created: result.rowCount > 0,
+        };
+    } catch (err) {
+        console.error("associateUserToMonitor error:", err);
+        return null;
+    }
+}
+
+/**
  * Get distinct user email addresses associated with a monitor
  * @param {int} monitorID - The monitor ID
  * @returns {Array<string>} Array of email addresses
@@ -347,6 +372,7 @@ async function getMonitorUserEmails(monitorID) {
 module.exports = {
     addRecord,
     monitorExists,
+    getMonitorByApiKey,
     getUserByUsername,
     getUserByEmail,
     getUserById,
@@ -355,6 +381,7 @@ module.exports = {
     getRecordById,
     userCanAccessMonitor,
     getMonitors,
+    associateUserToMonitor,
     getMonitorUserEmails,
     addAlert,
     hasRecentAlert
