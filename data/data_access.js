@@ -94,7 +94,7 @@ async function insertData(table, data = {}) {
  * @param {int} monitorID - The ID of the monitor associated with the record
  * @param {float} value - The decimal value derived from AI model
  * @param {string} imgName - The name of the associated image on disk
- * @returns {true|false} Whether the insert succeeded
+ * @returns {Object|null} Inserted record row or null on failure
  */
 async function addRecord(monitorID, value, imgName) {
     let newRecord = await insertData(`records`, {
@@ -105,9 +105,53 @@ async function addRecord(monitorID, value, imgName) {
     });
     if (!newRecord) {
         console.error(`Failed to insert new record into records table`);
+        return null;
+    }
+    return newRecord;
+}
+
+/**
+ * Insert an alert tied to a record
+ * @param {int} recordID - Record ID
+ * @param {string} alertType - Alert type label
+ * @param {string} alertMethod - Alert method enum value (email or sms)
+ * @returns {Object|null} Inserted alert row or null on failure
+ */
+async function addAlert(recordID, alertType = "dehydration", alertMethod = "email") {
+    return await insertData("alerts", {
+        record_id: recordID,
+        alert_type: alertType,
+        alert_method: alertMethod,
+    });
+}
+
+/**
+ * Check whether a recent alert exists for a monitor within the cooldown window
+ * @param {int} monitorID - Monitor ID
+ * @param {string} alertType - Alert type label
+ * @param {string} alertMethod - Alert method enum value (email or sms)
+ * @param {number} cooldownHours - Cooldown length in hours
+ * @returns {boolean} True if a recent alert exists
+ */
+async function hasRecentAlert(monitorID, alertType = "dehydration", alertMethod = "email", cooldownHours = 24) {
+    const text = `
+        SELECT 1
+        FROM alerts a
+        INNER JOIN records r ON r.record_id = a.record_id
+        WHERE r.monitor_id = $1
+          AND a.alert_type = $2
+          AND a.alert_method = $3
+          AND a.triggered_at >= NOW() - ($4 * INTERVAL '1 hour')
+        LIMIT 1;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, alertType, alertMethod, cooldownHours]);
+        return rows.length > 0;
+    } catch (err) {
+        console.error("hasRecentAlert error:", err);
         return false;
     }
-    return true;
 }
 
 /**
@@ -254,6 +298,29 @@ async function getMonitors(userID) {
     return rows;
 }
 
+/**
+ * Get distinct user email addresses associated with a monitor
+ * @param {int} monitorID - The monitor ID
+ * @returns {Array<string>} Array of email addresses
+ */
+async function getMonitorUserEmails(monitorID) {
+    const text = `
+        SELECT DISTINCT u.email
+        FROM users u
+        INNER JOIN users_monitors um ON um.user_id = u.user_id
+        WHERE um.monitor_id = $1
+        ORDER BY u.email ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID]);
+        return rows.map(r => r.email);
+    } catch (err) {
+        console.error("getMonitorUserEmails error:", err);
+        return [];
+    }
+}
+
 module.exports = {
     addRecord,
     monitorExists,
@@ -264,5 +331,8 @@ module.exports = {
     getPastRecords,
     getRecordById,
     userCanAccessMonitor,
-    getMonitors
+    getMonitors,
+    getMonitorUserEmails,
+    addAlert,
+    hasRecentAlert
 };

@@ -7,6 +7,7 @@ const express = require(`express`),
     fs = require('fs');
 
 const { analyzeImage } = require('../scripts/cv_analyze.js');
+const { sendAlertEmail } = require('../services/email/mailer');
 /*
     TODO:
     - check an API key to ensure request is from an authorized device
@@ -54,10 +55,86 @@ router.post(`/:monitorID`, async (req, res) => {
             try {
                 const analysis = await analyzeImage(imagePath);
                 const score = (analysis && analysis.score !== undefined) ? analysis.score : 0.0;
+                const alertThreshold = Number(process.env.ALERT_EMAIL_SCORE_THRESHOLD || "0.8");
+                const alertCooldownHours = Number(process.env.ALERT_EMAIL_COOLDOWN_HOURS || "24");
 
                 let insertedRecord = await db.addRecord(monitorID, score, imageName);
                 if (!insertedRecord) {
                     console.error(`Failed to insert record into database`, { monitorID, imageName });
+                }
+
+                // Email alerts are optional and env-gated; failures are logged but never break ingestion.
+                if (score <= alertThreshold) {
+                    try {
+                        const inCooldown = await db.hasRecentAlert(monitorID, "dehydration", "email", alertCooldownHours);
+                        if (inCooldown) {
+                            console.info(`Alert email skipped`, {
+                                monitorID,
+                                imageName,
+                                score,
+                                reason: `cooldown-active`,
+                                cooldownHours: alertCooldownHours,
+                            });
+                        } else {
+                            const recipients = await db.getMonitorUserEmails(monitorID);
+                            if (recipients.length === 0) {
+                                console.info(`Alert email skipped`, {
+                                    monitorID,
+                                    imageName,
+                                    score,
+                                    reason: `no-associated-user-emails`,
+                                });
+                            } else {
+                                let sentCount = 0;
+                                for (const recipient of recipients) {
+                                    const emailResult = await sendAlertEmail({
+                                        monitorId: monitorID,
+                                        score,
+                                        imageName,
+                                        to: recipient,
+                                        subject: `Cut Flower Alert - Monitor ${monitorID}`,
+                                        headline: `Alert triggered for monitor ${monitorID}`,
+                                        details: `AI analysis score reached ${score} (threshold ${alertThreshold}).`,
+                                        timestamp: new Date().toISOString(),
+                                    });
+
+                                    if (!emailResult.sent) {
+                                        console.info(`Alert email skipped`, {
+                                            monitorID,
+                                            imageName,
+                                            score,
+                                            recipient,
+                                            reason: emailResult.reason,
+                                        });
+                                    } else {
+                                        sentCount += 1;
+                                    }
+                                }
+
+                                if (sentCount > 0 && insertedRecord && insertedRecord.record_id) {
+                                    const insertedAlert = await db.addAlert(insertedRecord.record_id, "dehydration", "email");
+                                    if (!insertedAlert) {
+                                        console.error(`Failed to insert alert into database`, {
+                                            monitorID,
+                                            recordID: insertedRecord.record_id,
+                                        });
+                                    }
+                                } else if (sentCount > 0) {
+                                    console.error(`Alert sent but record reference missing; alert row not saved`, {
+                                        monitorID,
+                                        imageName,
+                                    });
+                                }
+                            }
+                        }
+                    } catch (emailErr) {
+                        console.error(`Alert email failed`, {
+                            monitorID,
+                            imageName,
+                            score,
+                            error: emailErr,
+                        });
+                    }
                 }
 
                 console.info(`Background analysis summary`, {
