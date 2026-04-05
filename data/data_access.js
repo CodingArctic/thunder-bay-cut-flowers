@@ -168,6 +168,29 @@ async function monitorExists(monitorID) {
 }
 
 /**
+ * Get monitor metadata by device API key
+ * @param {string} apiKey - Device API key
+ * @returns {Object|null} Monitor row or null if no match
+ */
+async function getMonitorByApiKey(apiKey) {
+    if (!apiKey) {
+        return null;
+    }
+
+    const rows = await getData(
+        `monitors`,
+        [`monitor_id`, `name`, `api_key`],
+        { api_key: apiKey }
+    );
+
+    if (!rows || rows.length === 0) {
+        return null;
+    }
+
+    return rows[0];
+}
+
+/**
  * Get a user by username
  * Used during login authentication
  * @param {string} username
