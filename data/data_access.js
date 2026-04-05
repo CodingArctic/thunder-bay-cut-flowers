@@ -168,6 +168,42 @@ async function monitorExists(monitorID) {
 }
 
 /**
+ * Get monitor metadata by device API key
+ * @param {string} apiKey - Device API key
+ * @returns {Object|null} Monitor row or null if no match
+ */
+async function getMonitorByApiKey(apiKey) {
+    if (!apiKey) {
+        return null;
+    }
+
+    const rows = await getData(
+        `monitors`,
+        [`monitor_id`, `name`, `api_key`],
+        { api_key: apiKey }
+    );
+
+    if (!rows || rows.length === 0) {
+        return null;
+    }
+
+    return rows[0];
+}
+
+/**
+ * Create a monitor with a provided API key
+ * @param {string} name - Human-readable monitor/device name
+ * @param {string} apiKey - Device API key
+ * @returns {Object|null} Monitor row or null on failure
+ */
+async function createMonitor(name, apiKey) {
+    return await insertData(`monitors`, {
+        name,
+        api_key: apiKey,
+    });
+}
+
+/**
  * Get a user by username
  * Used during login authentication
  * @param {string} username
@@ -285,17 +321,49 @@ async function userCanAccessMonitor(userID, monitorID) {
 /**
  * Get all monitors associated with the specified user
  * @param {int} userID - The user's ID
- * @returns {Array} Array of available monitor_id
+ * @returns {Array} Array of monitor objects with monitor_id and name
  */
 async function getMonitors(userID) {
-    const rows = await getData(
-        `users_monitors`,
-        "monitor_id",
-        { user_id: userID },
-        0,
-        { property: `monitor_id`, order: `ASC`}
-    );
-    return rows;
+    const text = `
+        SELECT m.monitor_id, m.name
+        FROM users_monitors um
+        INNER JOIN monitors m ON m.monitor_id = um.monitor_id
+        WHERE um.user_id = $1
+        ORDER BY m.monitor_id ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [userID]);
+        return rows;
+    } catch (err) {
+        console.error("getMonitors error:", err);
+        return [];
+    }
+}
+
+/**
+ * Associate a user with a monitor if not already linked
+ * @param {int} userID - The user's ID
+ * @param {int} monitorID - The monitor's ID
+ * @returns {{ created: boolean } | null} Result object or null on error
+ */
+async function associateUserToMonitor(userID, monitorID) {
+    const text = `
+        INSERT INTO users_monitors (user_id, monitor_id)
+        VALUES ($1, $2)
+        ON CONFLICT (monitor_id, user_id) DO NOTHING
+        RETURNING monitor_id;
+    `;
+
+    try {
+        const result = await pool.query(text, [userID, monitorID]);
+        return {
+            created: result.rowCount > 0,
+        };
+    } catch (err) {
+        console.error("associateUserToMonitor error:", err);
+        return null;
+    }
 }
 
 /**
@@ -324,6 +392,8 @@ async function getMonitorUserEmails(monitorID) {
 module.exports = {
     addRecord,
     monitorExists,
+    getMonitorByApiKey,
+    createMonitor,
     getUserByUsername,
     getUserByEmail,
     getUserById,
@@ -332,6 +402,7 @@ module.exports = {
     getRecordById,
     userCanAccessMonitor,
     getMonitors,
+    associateUserToMonitor,
     getMonitorUserEmails,
     addAlert,
     hasRecentAlert
