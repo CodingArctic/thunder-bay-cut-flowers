@@ -295,6 +295,89 @@ async function getPastRecords(monitorID, limit) {
 }
 
 /**
+ * Get a count of records for a monitor within a time range
+ * @param {int} monitorID - The monitor ID
+ * @param {Date|string} startTime - Inclusive range start
+ * @param {Date|string} endTime - Inclusive range end
+ * @returns {number} Number of matching records
+ */
+async function countRecordsInRange(monitorID, startTime, endTime) {
+    const text = `
+        SELECT COUNT(*)::int AS count
+        FROM records
+        WHERE monitor_id = $1
+          AND time >= $2
+          AND time <= $3;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, startTime, endTime]);
+        return rows[0]?.count || 0;
+    } catch (err) {
+        console.error("countRecordsInRange error:", err);
+        return 0;
+    }
+}
+
+/**
+ * Get raw records for a monitor within a time range ordered chronologically
+ * @param {int} monitorID - The monitor ID
+ * @param {Date|string} startTime - Inclusive range start
+ * @param {Date|string} endTime - Inclusive range end
+ * @returns {Array|null} Matching record rows or null on query error
+ */
+async function getRecordsInRange(monitorID, startTime, endTime) {
+    const text = `
+        SELECT record_id, monitor_id, time, dehydration_score
+        FROM records
+        WHERE monitor_id = $1
+          AND time >= $2
+          AND time <= $3
+        ORDER BY time ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, startTime, endTime]);
+        return rows;
+    } catch (err) {
+        console.error("getRecordsInRange error:", err);
+        return null;
+    }
+}
+
+/**
+ * Get hourly aggregates for a monitor within a time range
+ * @param {int} monitorID - The monitor ID
+ * @param {Date|string} startTime - Inclusive range start
+ * @param {Date|string} endTime - Inclusive range end
+ * @returns {Array|null} Hourly aggregate rows or null on query error
+ */
+async function getHourlyAverageRecordsInRange(monitorID, startTime, endTime) {
+    const text = `
+        SELECT
+            DATE_TRUNC('hour', time) AS time,
+            AVG(dehydration_score)::double precision AS dehydration_score,
+            MIN(dehydration_score)::double precision AS min_dehydration_score,
+            MAX(dehydration_score)::double precision AS max_dehydration_score,
+            COUNT(*)::int AS sample_count
+        FROM records
+        WHERE monitor_id = $1
+          AND time >= $2
+          AND time <= $3
+        GROUP BY DATE_TRUNC('hour', time)
+        ORDER BY time ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, startTime, endTime]);
+        return rows;
+    } catch (err) {
+        console.error("getHourlyAverageRecordsInRange error:", err);
+        return null;
+    }
+}
+
+/**
  * Get a single record by its ID
  * @param {int} recordID - The primary key of the record
  * @returns {Object|null} The record row or null
@@ -399,6 +482,9 @@ module.exports = {
     getUserById,
     createUser,
     getPastRecords,
+    countRecordsInRange,
+    getRecordsInRange,
+    getHourlyAverageRecordsInRange,
     getRecordById,
     userCanAccessMonitor,
     getMonitors,
