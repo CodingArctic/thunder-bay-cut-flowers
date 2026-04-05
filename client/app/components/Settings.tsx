@@ -12,8 +12,14 @@ interface UserData {
   phone_number: string | null;
 }
 
+interface MonitorSummary {
+  monitor_id: number;
+  name: string;
+}
+
 interface MonitorsResponse {
-  monitorIDs: number[];
+  monitorIDs?: number[];
+  monitors?: MonitorSummary[];
 }
 
 interface ClaimResponse {
@@ -41,7 +47,7 @@ export function Settings() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [monitors, setMonitors] = useState<number[]>([]);
+  const [monitors, setMonitors] = useState<MonitorSummary[]>([]);
   const [deviceApiKey, setDeviceApiKey] = useState('');
   const [createName, setCreateName] = useState('');
   const [deviceMessage, setDeviceMessage] = useState<string | null>(null);
@@ -57,7 +63,7 @@ export function Settings() {
   const loadMonitors = async () => {
     try {
       const response = await apiRequest<MonitorsResponse>('/api/monitors/all', 'GET');
-      setMonitors(response?.monitorIDs || []);
+      setMonitors(response?.monitors || []);
     } catch (err) {
       console.error('Failed to fetch monitors:', err);
       setDeviceError('Failed to load linked devices');
@@ -98,8 +104,8 @@ export function Settings() {
 
       setDeviceMessage(
         response.alreadyAssociated
-          ? `Monitor ${response.monitorID} is already linked to your account.`
-          : `Monitor ${response.monitorID} was successfully linked to your account.`
+          ? `Device claim confirmed for monitor ID ${response.monitorID}.`
+          : `Device claimed successfully for monitor ID ${response.monitorID}.`
       );
       setDeviceApiKey('');
       await loadMonitors();
@@ -266,12 +272,12 @@ export function Settings() {
                 <h3 className="text-sm font-semibold text-gray-800 mb-2">Linked Devices</h3>
                 {monitors.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {monitors.map((id) => (
+                    {monitors.map((monitor) => (
                       <span
-                        key={id}
+                        key={monitor.monitor_id}
                         className="inline-flex items-center rounded-full bg-[#ffe4b8] px-3 py-1 text-sm text-gray-800"
                       >
-                        Monitor {id}
+                        {monitor.name} (ID {monitor.monitor_id})
                       </span>
                     ))}
                   </div>

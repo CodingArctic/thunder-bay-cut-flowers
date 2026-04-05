@@ -1,6 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../utils/api-request';
 
+interface MonitorSummary {
+  monitor_id: number;
+  name: string;
+}
+
+interface MonitorsResponse {
+  monitorIDs?: number[];
+  monitors?: MonitorSummary[];
+}
+
 const radius = 40;
 const circumference = 2 * Math.PI * radius;
 
@@ -16,19 +26,19 @@ function getHealthEmoji(score: number): string {
 export function Data() {
   const [error, setError] = useState('');
   const [monitorID, setMonitorID] = useState('');
-  const [monitorOptions, setMonitorOptions] = useState<number[]>([]);
+  const [monitorOptions, setMonitorOptions] = useState<MonitorSummary[]>([]);
   const [records, setRecords] = useState<any[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchMonitors = async () => {
       try {
-        let response = await apiRequest(`/api/monitors/all`, `GET`) as { monitorIDs: number[] };
-        const monitors = response.monitorIDs || [];
+        const response = await apiRequest<MonitorsResponse>(`/api/monitors/all`, `GET`);
+        const monitors = response?.monitors || [];
         setMonitorOptions(monitors);
         // Set the first available monitor as default if not already set
         if (monitors.length > 0 && !monitorID) {
-          setMonitorID(String(monitors[0]));
+          setMonitorID(String(monitors[0].monitor_id));
         }
       } catch (error: any) {
         setError(error.message);
@@ -86,9 +96,9 @@ export function Data() {
                 className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
               >
                 <option value="">-- Select a Monitor --</option>
-                {monitorOptions.map((id) => (
-                  <option key={id} value={id}>
-                    Monitor {id}
+                {monitorOptions.map((monitor) => (
+                  <option key={monitor.monitor_id} value={monitor.monitor_id}>
+                    {monitor.name} (ID {monitor.monitor_id})
                   </option>
                 ))}
               </select>

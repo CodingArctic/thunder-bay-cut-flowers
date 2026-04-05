@@ -321,17 +321,24 @@ async function userCanAccessMonitor(userID, monitorID) {
 /**
  * Get all monitors associated with the specified user
  * @param {int} userID - The user's ID
- * @returns {Array} Array of available monitor_id
+ * @returns {Array} Array of monitor objects with monitor_id and name
  */
 async function getMonitors(userID) {
-    const rows = await getData(
-        `users_monitors`,
-        "monitor_id",
-        { user_id: userID },
-        0,
-        { property: `monitor_id`, order: `ASC`}
-    );
-    return rows;
+    const text = `
+        SELECT m.monitor_id, m.name
+        FROM users_monitors um
+        INNER JOIN monitors m ON m.monitor_id = um.monitor_id
+        WHERE um.user_id = $1
+        ORDER BY m.monitor_id ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [userID]);
+        return rows;
+    } catch (err) {
+        console.error("getMonitors error:", err);
+        return [];
+    }
 }
 
 /**
