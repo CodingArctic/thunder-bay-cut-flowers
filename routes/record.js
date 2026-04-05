@@ -7,22 +7,34 @@ const express = require(`express`),
     fs = require('fs');
 
 const { analyzeImage } = require('../scripts/cv_analyze.js');
-/*
-    TODO:
-    - check an API key to ensure request is from an authorized device
-*/
+const { sendAlertEmail } = require('../services/email/mailer');
 
-router.post(`/:monitorID`, async (req, res) => {
-    const monitorID = parseInt(req.params.monitorID);
-    
-    if (isNaN(monitorID)) {
-        return res.status(400).json({ "error": "Invalid Monitor ID" });
+function getDeviceApiKey(req) {
+    const headerValue = req.get('x-device-api-key') || req.get('x-api-key');
+    if (!headerValue) {
+        return null;
     }
 
-    let monitorExists = await db.monitorExists(monitorID);
-    if (!monitorExists) {
-        return res.status(404).json({ "error": "Invalid Monitor ID" });
+    const apiKey = String(headerValue).trim();
+    return apiKey.length > 0 ? apiKey : null;
+}
+
+async function handleRecordUpload(req, res, monitorID) {
+    const deviceApiKey = getDeviceApiKey(req);
+    if (!deviceApiKey) {
+        return res.status(401).json({ "error": "Missing device API key" });
     }
+
+    const monitor = await db.getMonitorByApiKey(deviceApiKey);
+    if (!monitor) {
+        return res.status(401).json({ "error": "Invalid device API key" });
+    }
+
+    if (typeof monitorID === `number` && monitor.monitor_id !== monitorID) {
+        return res.status(403).json({ "error": "API key is not authorized for this monitor" });
+    }
+
+    const resolvedMonitorID = monitor.monitor_id;
 
     if (req.files && Object.keys(req.files).length !== 0) {
         const uploadedFile = req.files.flower;
@@ -33,7 +45,7 @@ router.post(`/:monitorID`, async (req, res) => {
 
         const timestamp = new Date().toISOString().replace(/:/g, '-');
         const imageName = `${timestamp}.jpg`;
-        const uploadPath = path.join(__dirname, '..', 'imgs', '' + monitorID);
+    const uploadPath = path.join(__dirname, '..', 'imgs', '' + resolvedMonitorID);
         const imagePath = path.join(uploadPath, imageName);
 
         if (!fs.existsSync(uploadPath)) {
@@ -54,14 +66,90 @@ router.post(`/:monitorID`, async (req, res) => {
             try {
                 const analysis = await analyzeImage(imagePath);
                 const score = (analysis && analysis.score !== undefined) ? analysis.score : 0.0;
+                const alertThreshold = Number(process.env.ALERT_EMAIL_SCORE_THRESHOLD || "0.8");
+                const alertCooldownHours = Number(process.env.ALERT_EMAIL_COOLDOWN_HOURS || "24");
 
-                let insertedRecord = await db.addRecord(monitorID, score, imageName);
+                let insertedRecord = await db.addRecord(resolvedMonitorID, score, imageName);
                 if (!insertedRecord) {
-                    console.error(`Failed to insert record into database`, { monitorID, imageName });
+                    console.error(`Failed to insert record into database`, { monitorID: resolvedMonitorID, imageName });
+                }
+
+                // Email alerts are optional and env-gated; failures are logged but never break ingestion.
+                if (score <= alertThreshold) {
+                    try {
+                        const inCooldown = await db.hasRecentAlert(resolvedMonitorID, "dehydration", "email", alertCooldownHours);
+                        if (inCooldown) {
+                            console.info(`Alert email skipped`, {
+                                monitorID: resolvedMonitorID,
+                                imageName,
+                                score,
+                                reason: `cooldown-active`,
+                                cooldownHours: alertCooldownHours,
+                            });
+                        } else {
+                            const recipients = await db.getMonitorUserEmails(resolvedMonitorID);
+                            if (recipients.length === 0) {
+                                console.info(`Alert email skipped`, {
+                                    monitorID: resolvedMonitorID,
+                                    imageName,
+                                    score,
+                                    reason: `no-associated-user-emails`,
+                                });
+                            } else {
+                                let sentCount = 0;
+                                for (const recipient of recipients) {
+                                    const emailResult = await sendAlertEmail({
+                                        monitorId: resolvedMonitorID,
+                                        score,
+                                        imageName,
+                                        to: recipient,
+                                        subject: `Cut Flower Alert - Monitor ${resolvedMonitorID}`,
+                                        headline: `Alert triggered for monitor ${resolvedMonitorID}`,
+                                        details: `AI analysis score reached ${score} (threshold ${alertThreshold}).`,
+                                        timestamp: new Date().toISOString(),
+                                    });
+
+                                    if (!emailResult.sent) {
+                                        console.info(`Alert email skipped`, {
+                                            monitorID: resolvedMonitorID,
+                                            imageName,
+                                            score,
+                                            recipient,
+                                            reason: emailResult.reason,
+                                        });
+                                    } else {
+                                        sentCount += 1;
+                                    }
+                                }
+
+                                if (sentCount > 0 && insertedRecord && insertedRecord.record_id) {
+                                    const insertedAlert = await db.addAlert(insertedRecord.record_id, "dehydration", "email");
+                                    if (!insertedAlert) {
+                                        console.error(`Failed to insert alert into database`, {
+                                            monitorID: resolvedMonitorID,
+                                            recordID: insertedRecord.record_id,
+                                        });
+                                    }
+                                } else if (sentCount > 0) {
+                                    console.error(`Alert sent but record reference missing; alert row not saved`, {
+                                        monitorID: resolvedMonitorID,
+                                        imageName,
+                                    });
+                                }
+                            }
+                        }
+                    } catch (emailErr) {
+                        console.error(`Alert email failed`, {
+                            monitorID: resolvedMonitorID,
+                            imageName,
+                            score,
+                            error: emailErr,
+                        });
+                    }
                 }
 
                 console.info(`Background analysis summary`, {
-                    monitorID,
+                    monitorID: resolvedMonitorID,
                     imageName,
                     cvSucceeded: analysis !== null,
                     geminiUsed: Boolean(analysis && analysis.llm_used),
@@ -71,7 +159,7 @@ router.post(`/:monitorID`, async (req, res) => {
                     dbInsertSucceeded: Boolean(insertedRecord),
                 });
             } catch (err) {
-                console.error(`Background image analysis failed`, { monitorID, imageName, error: err });
+                console.error(`Background image analysis failed`, { monitorID: resolvedMonitorID, imageName, error: err });
             }
         })();
 
@@ -80,6 +168,20 @@ router.post(`/:monitorID`, async (req, res) => {
     } else {
         return res.status(400).json({ "error": "An image was not sent" });
     }
+}
+
+router.post(`/`, async (req, res) => {
+    return handleRecordUpload(req, res, null);
+});
+
+router.post(`/:monitorID`, async (req, res) => {
+    const monitorID = parseInt(req.params.monitorID);
+
+    if (isNaN(monitorID)) {
+        return res.status(400).json({ "error": "Invalid Monitor ID" });
+    }
+
+    return handleRecordUpload(req, res, monitorID);
 });
 
 /*
@@ -107,6 +209,86 @@ router.get(`/recent/:monitorID`, requireAuth, async (req, res) => {
 
     let records = await db.getPastRecords(monitorID, limit);
     return res.status(200).json(records);
+});
+
+/*
+    GET /api/record/range/:monitorID?start=&end=&aggregation=auto|raw|hour&maxPoints=
+    Returns records in a date/time range.
+    - raw: returns all points in range (chronological)
+    - hour: returns hourly aggregated points with average/min/max/sample_count
+    - auto (default): returns raw until point count exceeds maxPoints, then returns hour aggregates
+    Requires the authenticated user to be associated with the monitor.
+*/
+router.get(`/range/:monitorID`, requireAuth, async (req, res) => {
+    const monitorID = parseInt(req.params.monitorID);
+
+    if (isNaN(monitorID)) {
+        return res.status(400).json({ error: "Invalid Monitor ID" });
+    }
+
+    const startRaw = req.query.start;
+    const endRaw = req.query.end;
+
+    if (!startRaw || !endRaw) {
+        return res.status(400).json({ error: "start and end query parameters are required" });
+    }
+
+    const start = new Date(String(startRaw));
+    const end = new Date(String(endRaw));
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date/time format for start or end" });
+    }
+
+    if (start >= end) {
+        return res.status(400).json({ error: "start must be earlier than end" });
+    }
+
+    const requestedAggregation = String(req.query.aggregation || "auto").toLowerCase();
+    if (!["auto", "raw", "hour"].includes(requestedAggregation)) {
+        return res.status(400).json({ error: "aggregation must be one of: auto, raw, hour" });
+    }
+
+    const maxPoints = Number(req.query.maxPoints || 500);
+    if (!Number.isInteger(maxPoints) || maxPoints < 1 || maxPoints > 10000) {
+        return res.status(400).json({ error: "maxPoints must be an integer between 1 and 10000" });
+    }
+
+    let monitorExists = await db.monitorExists(monitorID);
+    if (!monitorExists) {
+        return res.status(404).json({ error: "Invalid Monitor ID" });
+    }
+
+    const canAccess = await db.userCanAccessMonitor(req.user.user_id, monitorID);
+    if (!canAccess) {
+        return res.status(403).json({ error: "You are not authorized to access this monitor" });
+    }
+
+    let effectiveAggregation = requestedAggregation;
+    if (requestedAggregation === "auto") {
+        const count = await db.countRecordsInRange(monitorID, start, end);
+        effectiveAggregation = count > maxPoints ? "hour" : "raw";
+    }
+
+    let records = null;
+    if (effectiveAggregation === "hour") {
+        records = await db.getHourlyAverageRecordsInRange(monitorID, start, end);
+    } else {
+        records = await db.getRecordsInRange(monitorID, start, end);
+    }
+
+    if (records === null) {
+        return res.status(500).json({ error: "Failed to query monitor records" });
+    }
+
+    return res.status(200).json({
+        monitorID,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        aggregation: effectiveAggregation,
+        pointCount: records.length,
+        data: records,
+    });
 });
 
 /*

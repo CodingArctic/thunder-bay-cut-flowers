@@ -1,0 +1,11 @@
+#pragma once
+
+#define SECRET_SSID "SSID_HERE"
+#define SECRET_PASSWORD "WIFI_PASSWORD_HERE"
+#define SECRET_API_KEY "API_KEY_HERE"
+
+#define SECRET_SERVER_NAME "URL_HERE"
+#define SECRET_SERVER_PATH "/api/record"
+
+#define SECRET_LAT LAT_HERE
+#define SECRET_LNG LONG_HERE

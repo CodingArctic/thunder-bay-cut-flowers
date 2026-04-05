@@ -5,50 +5,176 @@
 #include <WiFiClientSecure.h>
 #include "esp_sleep.h"
 #include "time.h"
+#include <ArduinoJson.h>
+#include "arduino_secrets.h"
 
 #include "ESP32_OV5640_AF.h"
 
 // ===================
 // Select camera model
 // ===================
-#define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
+#define CAMERA_MODEL_XIAO_ESP32S3
 #include "camera_pins.h"
+
+// -------- Debug --------
+#define DEBUG_SERIAL 1
+
+void logMsg(const String &msg) {
+#if DEBUG_SERIAL
+  Serial.println(msg);
+#endif
+}
 
 // -------- Camera AF helper --------
 OV5640 ov5640;
 
-// -------- Server config --------
-String serverName = "thunderbay.webdev.gccis.rit.edu";
-String serverPath = "/api/record/1";
-const int serverPort = 80; // not used directly with HTTPS URL but kept for reference
 
-// -------- WiFi config --------
-const char* ssid     = "RIT-WiFi";
-const char* password = "";
+
 
 // -------- Sleep config --------
 #define SLEEP_MINUTES 10
 #define uS_TO_S_FACTOR 1000000ULL
 
-// -------- Time / NTP config (US Eastern with DST) --------
+// -------- Time / NTP config --------
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "time.nist.gov";
-const char* tzEST = "EST5EDT,M3.2.0,M11.1.0";  // US Eastern with DST rules [web:2][web:11]
+const char* tzEST = "EST5EDT,M3.2.0,M11.1.0";
 
-// Forward declarations
+// -------- Sunrise/Sunset API --------
+const char* sunriseApiBase = "https://api.sunrise-sunset.org/json";
+
+
+const char* ssid       = SECRET_SSID;
+const char* password   = SECRET_PASSWORD;
+const char* apiKey     = SECRET_API_KEY;
+
+String serverName      = SECRET_SERVER_NAME;
+String serverPath      = SECRET_SERVER_PATH;
+
+const double LAT       = SECRET_LAT;
+const double LNG       = SECRET_LNG;
+
+// -------- Data --------
+struct SunTimes {
+  time_t sunrise;
+  time_t sunset;
+  bool valid;
+};
+
+// -------- Forward declarations --------
+bool initCamera();
+camera_fb_t* captureWithRetry(int attempts = 3);
 String sendPhotoHTTP();
-bool isWorkingHours();
-uint64_t secondsUntilNext9();
-
-// Optional: LED flash setup if defined by camera_pins.h
+bool getSunTimes(SunTimes &st);
+bool isDaylightNow(const SunTimes &st);
+uint64_t secondsUntilNextSunrise(const SunTimes &st);
+time_t utcTmToTimeT(struct tm tmUtc);
+bool parseUtcTimestamp(const char* iso8601, time_t &outTime);
 
 void setup() {
-  // Serial.begin(115200);
-  // Serial.setDebugOutput(true);
-  // Serial.println();
-  // Serial.println("Booting, initializing camera...");
+  Serial.begin(115200);
+  delay(1500);
+  Serial.println();
+  Serial.println("=== Boot ===");
 
-  // ----- Camera configuration -----
+  if (!initCamera()) {
+    Serial.println("Sleeping because camera init failed.");
+    delay(2000);
+    esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_MINUTES * 60 * uS_TO_S_FACTOR);
+    esp_deep_sleep_start();
+  }
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  WiFi.setSleep(false);
+
+  Serial.printf("Connecting to WiFi SSID: %s\n", ssid);
+
+  unsigned long startAttempt = millis();
+  const unsigned long wifiTimeout = 15000;
+
+  while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < wifiTimeout) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("WiFi connected");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("WiFi connect failed or timed out");
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Starting NTP sync...");
+    configTzTime(tzEST, ntpServer1, ntpServer2);
+
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 10000)) {
+      Serial.println("NTP sync OK");
+      Serial.print("Local time: ");
+      Serial.printf("%04d-%02d-%02d %02d:%02d:%02d\n",
+                    timeinfo.tm_year + 1900,
+                    timeinfo.tm_mon + 1,
+                    timeinfo.tm_mday,
+                    timeinfo.tm_hour,
+                    timeinfo.tm_min,
+                    timeinfo.tm_sec);
+    } else {
+      Serial.println("NTP sync failed");
+    }
+  }
+
+  SunTimes st{0, 0, false};
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Fetching sunrise/sunset...");
+    st.valid = getSunTimes(st);
+    Serial.print("Sun time fetch result: ");
+    Serial.println(st.valid ? "OK" : "FAILED");
+  } else {
+    Serial.println("Skipping sunrise/sunset fetch because WiFi is down");
+  }
+
+  if (!st.valid) {
+    Serial.println("Sun times invalid, using fallback short sleep.");
+    uint64_t sleepSeconds = (uint64_t)SLEEP_MINUTES * 60;
+    Serial.printf("Sleeping for %llu seconds\n", sleepSeconds);
+    esp_sleep_enable_timer_wakeup(sleepSeconds * uS_TO_S_FACTOR);
+    esp_deep_sleep_start();
+  }
+
+  if (!isDaylightNow(st)) {
+    uint64_t sleepSeconds = secondsUntilNextSunrise(st);
+    Serial.printf("Outside daylight hours, sleeping for %llu seconds\n", sleepSeconds);
+    esp_sleep_enable_timer_wakeup(sleepSeconds * uS_TO_S_FACTOR);
+    esp_deep_sleep_start();
+  } else {
+    Serial.println("Daylight hours detected, taking photo...");
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    String response = sendPhotoHTTP();
+    Serial.print("Upload response: ");
+    Serial.println(response);
+  } else {
+    Serial.println("WiFi not connected, skipping upload");
+  }
+
+  delay(2000);
+
+  uint64_t sleepSeconds = (uint64_t)SLEEP_MINUTES * 60;
+  Serial.printf("Sleeping for %llu seconds\n", sleepSeconds);
+  esp_sleep_enable_timer_wakeup(sleepSeconds * uS_TO_S_FACTOR);
+  esp_deep_sleep_start();
+}
+
+void loop() {}
+
+bool initCamera() {
+  Serial.println("Initializing camera...");
+
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -68,214 +194,334 @@ void setup() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
+
+  config.xclk_freq_hz = 10000000;
   config.frame_size = FRAMESIZE_UXGA;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  config.grab_mode = CAMERA_GRAB_LATEST;
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
-  config.fb_count = 1;
+  config.fb_count = 2;
 
-  if (config.pixel_format == PIXFORMAT_JPEG) {
-    if (psramFound()) {
-      config.jpeg_quality = 10;
-      config.fb_count = 2;
-      config.grab_mode = CAMERA_GRAB_LATEST;
-    } else {
-      config.frame_size = FRAMESIZE_SVGA;
-      config.fb_location = CAMERA_FB_IN_DRAM;
-    }
+  if (!psramFound()) {
+    Serial.println("PSRAM not found, falling back to DRAM settings");
+    config.frame_size = FRAMESIZE_SVGA;
+    config.fb_location = CAMERA_FB_IN_DRAM;
+    config.fb_count = 1;
   } else {
-    config.frame_size = FRAMESIZE_240X240;
-  #if CONFIG_IDF_TARGET_ESP32S3
-    config.fb_count = 2;
-  #endif
+    Serial.println("PSRAM found");
   }
 
-  // Initialize camera
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    // Serial.printf("Camera init failed with error 0x%x\n", err);
-    delay(2000);
-    // If camera fails, still go to sleep to save power
-    esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_MINUTES * 60 * uS_TO_S_FACTOR);
-    esp_deep_sleep_start();
+    Serial.printf("Camera init failed with error 0x%x\n", err);
+    return false;
   }
 
-  sensor_t *s = esp_camera_sensor_get();
+  Serial.println("Camera init OK");
 
-  s->set_vflip(s, 1);    // vertical flip
+  sensor_t *s = esp_camera_sensor_get();
+  if (!s) {
+    Serial.println("Failed to get camera sensor");
+    return false;
+  }
+
+  s->set_vflip(s, 1);
   s->set_hmirror(s, 1);
 
-  // Example sensor tweaks
   if (s->id.PID == OV3660_PID) {
     s->set_vflip(s, 1);
     s->set_brightness(s, 1);
     s->set_saturation(s, -2);
   }
 
-  // For OV5640 AF, FHD is usually good for focusing
-  if (config.pixel_format == PIXFORMAT_JPEG) {
-    s->set_framesize(s, FRAMESIZE_FHD);
-  }
+  s->set_framesize(s, FRAMESIZE_FHD);
 
-  // Autofocus init
+  Serial.println("Starting autofocus...");
   ov5640.start(s);
   ov5640.focusInit();
   ov5640.autoFocusMode();
+
+  Serial.println("Waiting for camera/AF to settle...");
+  delay(1500);
 
 #if defined(LED_GPIO_NUM)
   setupLedFlash(LED_GPIO_NUM);
 #endif
 
-  // ----- WiFi connect -----
-  // Serial.println("Connecting to WiFi...");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
+  Serial.println("Camera sensor and autofocus configured");
+  return true;
+}
 
-  unsigned long startAttempt = millis();
-  const unsigned long wifiTimeout = 15000; // 15s timeout
+camera_fb_t* captureWithRetry(int attempts) {
+  for (int i = 1; i <= attempts; i++) {
+    Serial.printf("Capture attempt %d/%d\n", i, attempts);
 
-  while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < wifiTimeout) {
-    delay(500);
-    // Serial.print(".");
-  }
-  // Serial.println();
+    delay(300);
 
-  // ----- Time sync (only if we got WiFi) -----
-  if (WiFi.status() == WL_CONNECTED) {
-    // Use timezone rules for US Eastern and NTP. [web:2][web:14]
-    configTzTime(tzEST, ntpServer1, ntpServer2);
-
-    // Give it some time to get the first sync.
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo, 10000)) {
-      // Serial.println("Failed to obtain time");
-    } else {
-      // Serial.print("Current local time: ");
-      // Serial.println(&timeinfo, "%Y-%m-%d %H:%M:%S");
+    camera_fb_t *fb = esp_camera_fb_get();
+    if (fb) {
+      Serial.print("Capture OK, bytes: ");
+      Serial.println(fb->len);
+      return fb;
     }
+
+    Serial.println("Capture failed");
+
+    sensor_t *s = esp_camera_sensor_get();
+    if (s) {
+      Serial.println("Re-triggering autofocus...");
+      ov5640.start(s);
+      ov5640.focusInit();
+      ov5640.autoFocusMode();
+    }
+
+    delay(1000);
   }
 
-  // ----- Decide if we should run or sleep for the night -----
-  if (!isWorkingHours()) {
-    // Outside 9–17 Eastern: long sleep until next 09:00.
-    uint64_t sleepSeconds = secondsUntilNext9();
-    // Serial.print("Outside working hours, sleeping for ");
-    // Serial.print((unsigned long)sleepSeconds);
-    // Serial.println(" seconds until next 09:00 Eastern.");
+  Serial.println("All capture attempts failed");
+  return nullptr;
+}
 
-    esp_sleep_enable_timer_wakeup(sleepSeconds * uS_TO_S_FACTOR);
-    esp_deep_sleep_start();
+bool getSunTimes(SunTimes &st) {
+  st.valid = false;
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("getSunTimes: WiFi not connected");
+    return false;
   }
 
-  // ----- Take photo and upload (only during 9–17) -----
-  if (WiFi.status() == WL_CONNECTED) {
-    String res = sendPhotoHTTP();
-    // Serial.println("Upload result:");
-    // Serial.println(res);
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  HTTPClient http;
+  String url = String(sunriseApiBase) +
+               "?lat=" + String(LAT, 6) +
+               "&lng=" + String(LNG, 6) +
+               "&formatted=0";
+
+  Serial.print("Sunrise API URL: ");
+  Serial.println(url);
+
+  if (!http.begin(client, url)) {
+    Serial.println("getSunTimes: http.begin failed");
+    return false;
+  }
+
+  int code = http.GET();
+  Serial.print("Sunrise API HTTP code: ");
+  Serial.println(code);
+
+  if (code != HTTP_CODE_OK) {
+    String errBody = http.getString();
+    Serial.println("HTTP body on error:");
+    Serial.println(errBody);
+    http.end();
+    return false;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+  Serial.println("Raw API payload:");
+  Serial.println(payload);
+
+  DynamicJsonDocument doc(4096);
+  DeserializationError err = deserializeJson(doc, payload);
+
+  if (err) {
+    Serial.print("JSON parse failed: ");
+    Serial.println(err.c_str());
+    return false;
+  }
+
+  const char* status = doc["status"];
+  const char* sunriseStr = doc["results"]["sunrise"];
+  const char* sunsetStr  = doc["results"]["sunset"];
+
+  Serial.print("API status: ");
+  Serial.println(status ? status : "(null)");
+  Serial.print("Raw sunrise: ");
+  Serial.println(sunriseStr ? sunriseStr : "(null)");
+  Serial.print("Raw sunset: ");
+  Serial.println(sunsetStr ? sunsetStr : "(null)");
+
+  if (!status || String(status) != "OK") {
+    Serial.println("API status not OK");
+    return false;
+  }
+
+  if (!sunriseStr || !sunsetStr) {
+    Serial.println("Missing sunrise or sunset field");
+    return false;
+  }
+
+  if (!parseUtcTimestamp(sunriseStr, st.sunrise)) {
+    Serial.println("Failed to parse sunrise");
+    return false;
+  }
+
+  if (!parseUtcTimestamp(sunsetStr, st.sunset)) {
+    Serial.println("Failed to parse sunset");
+    return false;
+  }
+
+  st.valid = true;
+
+  Serial.print("Parsed sunrise epoch: ");
+  Serial.println((uint32_t)st.sunrise);
+  Serial.print("Parsed sunset epoch: ");
+  Serial.println((uint32_t)st.sunset);
+
+  return true;
+}
+
+bool parseUtcTimestamp(const char* iso8601, time_t &outTime) {
+  struct tm tmUtc = {};
+  int year, month, day, hour, minute, second;
+
+  Serial.print("Parsing UTC timestamp: ");
+  Serial.println(iso8601);
+
+  if (strlen(iso8601) < 19) {
+    Serial.println("Timestamp too short");
+    return false;
+  }
+
+  char buf[20];
+  memcpy(buf, iso8601, 19);
+  buf[19] = '\0';
+
+  if (sscanf(buf, "%d-%d-%dT%d:%d:%d",
+             &year, &month, &day, &hour, &minute, &second) != 6) {
+    Serial.println("sscanf parse failed");
+    return false;
+  }
+
+  tmUtc.tm_year = year - 1900;
+  tmUtc.tm_mon  = month - 1;
+  tmUtc.tm_mday = day;
+  tmUtc.tm_hour = hour;
+  tmUtc.tm_min  = minute;
+  tmUtc.tm_sec  = second;
+  tmUtc.tm_isdst = 0;
+
+  outTime = utcTmToTimeT(tmUtc);
+
+  Serial.print("Converted epoch: ");
+  Serial.println((uint32_t)outTime);
+
+  return true;
+}
+
+time_t utcTmToTimeT(struct tm tmUtc) {
+  char* oldTz = getenv("TZ");
+  String savedTz = oldTz ? String(oldTz) : String("");
+
+  setenv("TZ", "UTC0", 1);
+  tzset();
+
+  time_t t = mktime(&tmUtc);
+
+  if (savedTz.length() > 0) {
+    setenv("TZ", savedTz.c_str(), 1);
   } else {
-    // Serial.println("WiFi not connected; skipping upload this cycle.");
+    unsetenv("TZ");
   }
+  tzset();
 
-  // Small delay for logs to flush
-  delay(2000);
-
-  // ----- Short deep sleep between captures (1 minute) -----
-  uint64_t sleepSeconds = (uint64_t)SLEEP_MINUTES * 60;
-  // Serial.print("In working hours, sleeping for ");
-  // Serial.print((unsigned long)sleepSeconds);
-  // Serial.println(" seconds.");
-
-  esp_sleep_enable_timer_wakeup(sleepSeconds * uS_TO_S_FACTOR);
-  esp_deep_sleep_start();
+  return t;
 }
 
-void loop() {
-  // Not used; device sleeps from setup()
-}
-
-// Returns true if current local time is between 09:00:00 and 16:59:59 Eastern.
-bool isWorkingHours() {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    // If we can't get time, default to "working" so it still runs.
+bool isDaylightNow(const SunTimes &st) {
+  struct tm nowTm;
+  if (!getLocalTime(&nowTm)) {
+    Serial.println("isDaylightNow: getLocalTime failed, assuming daylight");
     return true;
   }
 
-  int hour = timeinfo.tm_hour; // 0–23 in local time
-  // 9:00–16:59 inclusive. Change <17 to <=17 if you want 17:00–17:59 included.
-  bool working = (hour >= 9 && hour < 17);
+  time_t now = mktime(&nowTm);
 
-  // Serial.print("Local hour: ");
-  // Serial.print(hour);
-  // Serial.print(" -> workingHours=");
-  // Serial.println(working ? "true" : "false");
+  Serial.print("Now epoch: ");
+  Serial.println((uint32_t)now);
+  Serial.print("Sunrise epoch: ");
+  Serial.println((uint32_t)st.sunrise);
+  Serial.print("Sunset epoch: ");
+  Serial.println((uint32_t)st.sunset);
 
-  return working;
+  bool daylight = (now >= st.sunrise && now < st.sunset);
+  Serial.print("Daylight result: ");
+  Serial.println(daylight ? "true" : "false");
+
+  return daylight;
 }
 
-// Compute seconds until next 09:00 Eastern from current local time.
-uint64_t secondsUntilNext9() {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) {
-    // If no time, fall back to e.g. 8 hours.
+uint64_t secondsUntilNextSunrise(const SunTimes &st) {
+  struct tm nowTm;
+  if (!getLocalTime(&nowTm)) {
+    Serial.println("secondsUntilNextSunrise: getLocalTime failed, using 8 hours");
     return 8ULL * 3600ULL;
   }
 
-  int hour   = timeinfo.tm_hour;
-  int minute = timeinfo.tm_min;
-  int second = timeinfo.tm_sec;
+  time_t now = mktime(&nowTm);
 
-  int todaySeconds  = hour * 3600 + minute * 60 + second;
-  int targetSeconds = 9 * 3600; // 09:00:00
+  Serial.print("Now epoch: ");
+  Serial.println((uint32_t)now);
 
-  int delta = targetSeconds - todaySeconds;
-  if (delta <= 0) {
-    // Already past 09:00 today; schedule for tomorrow 09:00.
-    delta += 24 * 3600;
+  if (now < st.sunrise) {
+    uint64_t delta = (uint64_t)(st.sunrise - now);
+    Serial.print("Sleeping until today's sunrise in seconds: ");
+    Serial.println((uint32_t)delta);
+    return delta;
   }
 
-  return (uint64_t)delta;
+  uint64_t delta = (uint64_t)((st.sunrise + 24 * 3600) - now);
+  Serial.print("Sleeping until tomorrow's sunrise in seconds: ");
+  Serial.println((uint32_t)delta);
+  return delta;
 }
 
-// HTTPS multipart upload
 String sendPhotoHTTP() {
-  camera_fb_t *fb = esp_camera_fb_get();
+  Serial.println("Capturing photo...");
+  camera_fb_t *fb = captureWithRetry(3);
   if (!fb) {
-    // Serial.println("Camera capture failed");
+    Serial.println("Camera capture failed after retries");
     return "capture_failed";
   }
 
-  // Serial.print("Image size: ");
-  // Serial.print(fb->len);
-  // Serial.println(" bytes");
-
   HTTPClient http;
   WiFiClientSecure client;
-
-  client.setInsecure(); // no certificate validation
+  client.setInsecure();
 
   String url = "https://" + serverName + serverPath;
-  // Serial.println("Posting to: " + url);
+  Serial.print("POST URL: ");
+  Serial.println(url);
 
   http.begin(client, url);
+
   String boundary = "Esp32Boundary";
   http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+  http.addHeader("x-api-key", apiKey);
+
+  Serial.println("Added header: x-api-key");
 
   String head =
     "--" + boundary + "\r\n"
     "Content-Disposition: form-data; name=\"flower\"; filename=\"esp32.jpg\"\r\n"
     "Content-Type: image/jpeg\r\n\r\n";
+
   String tail =
     "\r\n--" + boundary + "--\r\n";
 
   uint32_t totalLen = head.length() + fb->len + tail.length();
+  Serial.print("Upload payload size: ");
+  Serial.println(totalLen);
+
   uint8_t *payload = (uint8_t*)malloc(totalLen);
   if (!payload) {
-    // Serial.println("Failed to allocate memory");
+    Serial.println("malloc failed");
     esp_camera_fb_return(fb);
+    http.end();
     return "malloc_failed";
   }
 
@@ -285,21 +531,20 @@ String sendPhotoHTTP() {
 
   esp_camera_fb_return(fb);
 
-  // Serial.println("Sending POST request...");
+  Serial.println("Sending POST...");
   int httpResponseCode = http.POST(payload, totalLen);
-
   free(payload);
+
+  Serial.print("HTTP response code: ");
+  Serial.println(httpResponseCode);
 
   String response = "";
   if (httpResponseCode > 0) {
-    // Serial.print("HTTP Response code: ");
-    // Serial.println(httpResponseCode);
     response = http.getString();
-    // Serial.println("Response:");
-    // Serial.println(response);
+    Serial.print("Response body: ");
+    Serial.println(response);
   } else {
-    // Serial.print("Error code: ");
-    // Serial.println(httpResponseCode);
+    Serial.println("POST failed");
   }
 
   http.end();

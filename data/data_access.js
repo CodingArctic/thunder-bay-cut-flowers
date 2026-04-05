@@ -94,7 +94,7 @@ async function insertData(table, data = {}) {
  * @param {int} monitorID - The ID of the monitor associated with the record
  * @param {float} value - The decimal value derived from AI model
  * @param {string} imgName - The name of the associated image on disk
- * @returns {true|false} Whether the insert succeeded
+ * @returns {Object|null} Inserted record row or null on failure
  */
 async function addRecord(monitorID, value, imgName) {
     let newRecord = await insertData(`records`, {
@@ -105,9 +105,53 @@ async function addRecord(monitorID, value, imgName) {
     });
     if (!newRecord) {
         console.error(`Failed to insert new record into records table`);
+        return null;
+    }
+    return newRecord;
+}
+
+/**
+ * Insert an alert tied to a record
+ * @param {int} recordID - Record ID
+ * @param {string} alertType - Alert type label
+ * @param {string} alertMethod - Alert method enum value (email or sms)
+ * @returns {Object|null} Inserted alert row or null on failure
+ */
+async function addAlert(recordID, alertType = "dehydration", alertMethod = "email") {
+    return await insertData("alerts", {
+        record_id: recordID,
+        alert_type: alertType,
+        alert_method: alertMethod,
+    });
+}
+
+/**
+ * Check whether a recent alert exists for a monitor within the cooldown window
+ * @param {int} monitorID - Monitor ID
+ * @param {string} alertType - Alert type label
+ * @param {string} alertMethod - Alert method enum value (email or sms)
+ * @param {number} cooldownHours - Cooldown length in hours
+ * @returns {boolean} True if a recent alert exists
+ */
+async function hasRecentAlert(monitorID, alertType = "dehydration", alertMethod = "email", cooldownHours = 24) {
+    const text = `
+        SELECT 1
+        FROM alerts a
+        INNER JOIN records r ON r.record_id = a.record_id
+        WHERE r.monitor_id = $1
+          AND a.alert_type = $2
+          AND a.alert_method = $3
+          AND a.triggered_at >= NOW() - ($4 * INTERVAL '1 hour')
+        LIMIT 1;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, alertType, alertMethod, cooldownHours]);
+        return rows.length > 0;
+    } catch (err) {
+        console.error("hasRecentAlert error:", err);
         return false;
     }
-    return true;
 }
 
 /**
@@ -121,6 +165,42 @@ async function monitorExists(monitorID) {
         return false;
     }
     return true;
+}
+
+/**
+ * Get monitor metadata by device API key
+ * @param {string} apiKey - Device API key
+ * @returns {Object|null} Monitor row or null if no match
+ */
+async function getMonitorByApiKey(apiKey) {
+    if (!apiKey) {
+        return null;
+    }
+
+    const rows = await getData(
+        `monitors`,
+        [`monitor_id`, `name`, `api_key`],
+        { api_key: apiKey }
+    );
+
+    if (!rows || rows.length === 0) {
+        return null;
+    }
+
+    return rows[0];
+}
+
+/**
+ * Create a monitor with a provided API key
+ * @param {string} name - Human-readable monitor/device name
+ * @param {string} apiKey - Device API key
+ * @returns {Object|null} Monitor row or null on failure
+ */
+async function createMonitor(name, apiKey) {
+    return await insertData(`monitors`, {
+        name,
+        api_key: apiKey,
+    });
 }
 
 /**
@@ -215,6 +295,89 @@ async function getPastRecords(monitorID, limit) {
 }
 
 /**
+ * Get a count of records for a monitor within a time range
+ * @param {int} monitorID - The monitor ID
+ * @param {Date|string} startTime - Inclusive range start
+ * @param {Date|string} endTime - Inclusive range end
+ * @returns {number} Number of matching records
+ */
+async function countRecordsInRange(monitorID, startTime, endTime) {
+    const text = `
+        SELECT COUNT(*)::int AS count
+        FROM records
+        WHERE monitor_id = $1
+          AND time >= $2
+          AND time <= $3;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, startTime, endTime]);
+        return rows[0]?.count || 0;
+    } catch (err) {
+        console.error("countRecordsInRange error:", err);
+        return 0;
+    }
+}
+
+/**
+ * Get raw records for a monitor within a time range ordered chronologically
+ * @param {int} monitorID - The monitor ID
+ * @param {Date|string} startTime - Inclusive range start
+ * @param {Date|string} endTime - Inclusive range end
+ * @returns {Array|null} Matching record rows or null on query error
+ */
+async function getRecordsInRange(monitorID, startTime, endTime) {
+    const text = `
+        SELECT record_id, monitor_id, time, dehydration_score
+        FROM records
+        WHERE monitor_id = $1
+          AND time >= $2
+          AND time <= $3
+        ORDER BY time ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, startTime, endTime]);
+        return rows;
+    } catch (err) {
+        console.error("getRecordsInRange error:", err);
+        return null;
+    }
+}
+
+/**
+ * Get hourly aggregates for a monitor within a time range
+ * @param {int} monitorID - The monitor ID
+ * @param {Date|string} startTime - Inclusive range start
+ * @param {Date|string} endTime - Inclusive range end
+ * @returns {Array|null} Hourly aggregate rows or null on query error
+ */
+async function getHourlyAverageRecordsInRange(monitorID, startTime, endTime) {
+    const text = `
+        SELECT
+            DATE_TRUNC('hour', time) AS time,
+            AVG(dehydration_score)::double precision AS dehydration_score,
+            MIN(dehydration_score)::double precision AS min_dehydration_score,
+            MAX(dehydration_score)::double precision AS max_dehydration_score,
+            COUNT(*)::int AS sample_count
+        FROM records
+        WHERE monitor_id = $1
+          AND time >= $2
+          AND time <= $3
+        GROUP BY DATE_TRUNC('hour', time)
+        ORDER BY time ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, startTime, endTime]);
+        return rows;
+    } catch (err) {
+        console.error("getHourlyAverageRecordsInRange error:", err);
+        return null;
+    }
+}
+
+/**
  * Get a single record by its ID
  * @param {int} recordID - The primary key of the record
  * @returns {Object|null} The record row or null
@@ -241,28 +404,92 @@ async function userCanAccessMonitor(userID, monitorID) {
 /**
  * Get all monitors associated with the specified user
  * @param {int} userID - The user's ID
- * @returns {Array} Array of available monitor_id
+ * @returns {Array} Array of monitor objects with monitor_id and name
  */
 async function getMonitors(userID) {
-    const rows = await getData(
-        `users_monitors`,
-        "monitor_id",
-        { user_id: userID },
-        0,
-        { property: `monitor_id`, order: `ASC`}
-    );
-    return rows;
+    const text = `
+        SELECT m.monitor_id, m.name
+        FROM users_monitors um
+        INNER JOIN monitors m ON m.monitor_id = um.monitor_id
+        WHERE um.user_id = $1
+        ORDER BY m.monitor_id ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [userID]);
+        return rows;
+    } catch (err) {
+        console.error("getMonitors error:", err);
+        return [];
+    }
+}
+
+/**
+ * Associate a user with a monitor if not already linked
+ * @param {int} userID - The user's ID
+ * @param {int} monitorID - The monitor's ID
+ * @returns {{ created: boolean } | null} Result object or null on error
+ */
+async function associateUserToMonitor(userID, monitorID) {
+    const text = `
+        INSERT INTO users_monitors (user_id, monitor_id)
+        VALUES ($1, $2)
+        ON CONFLICT (monitor_id, user_id) DO NOTHING
+        RETURNING monitor_id;
+    `;
+
+    try {
+        const result = await pool.query(text, [userID, monitorID]);
+        return {
+            created: result.rowCount > 0,
+        };
+    } catch (err) {
+        console.error("associateUserToMonitor error:", err);
+        return null;
+    }
+}
+
+/**
+ * Get distinct user email addresses associated with a monitor
+ * @param {int} monitorID - The monitor ID
+ * @returns {Array<string>} Array of email addresses
+ */
+async function getMonitorUserEmails(monitorID) {
+    const text = `
+        SELECT DISTINCT u.email
+        FROM users u
+        INNER JOIN users_monitors um ON um.user_id = u.user_id
+        WHERE um.monitor_id = $1
+        ORDER BY u.email ASC;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID]);
+        return rows.map(r => r.email);
+    } catch (err) {
+        console.error("getMonitorUserEmails error:", err);
+        return [];
+    }
 }
 
 module.exports = {
     addRecord,
     monitorExists,
+    getMonitorByApiKey,
+    createMonitor,
     getUserByUsername,
     getUserByEmail,
     getUserById,
     createUser,
     getPastRecords,
+    countRecordsInRange,
+    getRecordsInRange,
+    getHourlyAverageRecordsInRange,
     getRecordById,
     userCanAccessMonitor,
-    getMonitors
+    getMonitors,
+    associateUserToMonitor,
+    getMonitorUserEmails,
+    addAlert,
+    hasRecentAlert
 };
