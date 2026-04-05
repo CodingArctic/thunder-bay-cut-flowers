@@ -1,0 +1,5 @@
+#pragma once
+
+#define SECRET_SSID "SSID_HERE"
+#define SECRET_PASSWORD "WIFI_PASSWORD_HERE"
+#define SECRET_API_KEY "API_KEY_HERE"
