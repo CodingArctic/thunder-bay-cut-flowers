@@ -19,13 +19,7 @@ function getDeviceApiKey(req) {
     return apiKey.length > 0 ? apiKey : null;
 }
 
-router.post(`/:monitorID`, async (req, res) => {
-    const monitorID = parseInt(req.params.monitorID);
-    
-    if (isNaN(monitorID)) {
-        return res.status(400).json({ "error": "Invalid Monitor ID" });
-    }
-
+async function handleRecordUpload(req, res, monitorID) {
     const deviceApiKey = getDeviceApiKey(req);
     if (!deviceApiKey) {
         return res.status(401).json({ "error": "Missing device API key" });
@@ -36,9 +30,11 @@ router.post(`/:monitorID`, async (req, res) => {
         return res.status(401).json({ "error": "Invalid device API key" });
     }
 
-    if (monitor.monitor_id !== monitorID) {
+    if (typeof monitorID === `number` && monitor.monitor_id !== monitorID) {
         return res.status(403).json({ "error": "API key is not authorized for this monitor" });
     }
+
+    const resolvedMonitorID = monitor.monitor_id;
 
     if (req.files && Object.keys(req.files).length !== 0) {
         const uploadedFile = req.files.flower;
@@ -49,7 +45,7 @@ router.post(`/:monitorID`, async (req, res) => {
 
         const timestamp = new Date().toISOString().replace(/:/g, '-');
         const imageName = `${timestamp}.jpg`;
-        const uploadPath = path.join(__dirname, '..', 'imgs', '' + monitorID);
+    const uploadPath = path.join(__dirname, '..', 'imgs', '' + resolvedMonitorID);
         const imagePath = path.join(uploadPath, imageName);
 
         if (!fs.existsSync(uploadPath)) {
@@ -73,28 +69,28 @@ router.post(`/:monitorID`, async (req, res) => {
                 const alertThreshold = Number(process.env.ALERT_EMAIL_SCORE_THRESHOLD || "0.8");
                 const alertCooldownHours = Number(process.env.ALERT_EMAIL_COOLDOWN_HOURS || "24");
 
-                let insertedRecord = await db.addRecord(monitorID, score, imageName);
+                let insertedRecord = await db.addRecord(resolvedMonitorID, score, imageName);
                 if (!insertedRecord) {
-                    console.error(`Failed to insert record into database`, { monitorID, imageName });
+                    console.error(`Failed to insert record into database`, { monitorID: resolvedMonitorID, imageName });
                 }
 
                 // Email alerts are optional and env-gated; failures are logged but never break ingestion.
                 if (score <= alertThreshold) {
                     try {
-                        const inCooldown = await db.hasRecentAlert(monitorID, "dehydration", "email", alertCooldownHours);
+                        const inCooldown = await db.hasRecentAlert(resolvedMonitorID, "dehydration", "email", alertCooldownHours);
                         if (inCooldown) {
                             console.info(`Alert email skipped`, {
-                                monitorID,
+                                monitorID: resolvedMonitorID,
                                 imageName,
                                 score,
                                 reason: `cooldown-active`,
                                 cooldownHours: alertCooldownHours,
                             });
                         } else {
-                            const recipients = await db.getMonitorUserEmails(monitorID);
+                            const recipients = await db.getMonitorUserEmails(resolvedMonitorID);
                             if (recipients.length === 0) {
                                 console.info(`Alert email skipped`, {
-                                    monitorID,
+                                    monitorID: resolvedMonitorID,
                                     imageName,
                                     score,
                                     reason: `no-associated-user-emails`,
@@ -103,19 +99,19 @@ router.post(`/:monitorID`, async (req, res) => {
                                 let sentCount = 0;
                                 for (const recipient of recipients) {
                                     const emailResult = await sendAlertEmail({
-                                        monitorId: monitorID,
+                                        monitorId: resolvedMonitorID,
                                         score,
                                         imageName,
                                         to: recipient,
-                                        subject: `Cut Flower Alert - Monitor ${monitorID}`,
-                                        headline: `Alert triggered for monitor ${monitorID}`,
+                                        subject: `Cut Flower Alert - Monitor ${resolvedMonitorID}`,
+                                        headline: `Alert triggered for monitor ${resolvedMonitorID}`,
                                         details: `AI analysis score reached ${score} (threshold ${alertThreshold}).`,
                                         timestamp: new Date().toISOString(),
                                     });
 
                                     if (!emailResult.sent) {
                                         console.info(`Alert email skipped`, {
-                                            monitorID,
+                                            monitorID: resolvedMonitorID,
                                             imageName,
                                             score,
                                             recipient,
@@ -130,13 +126,13 @@ router.post(`/:monitorID`, async (req, res) => {
                                     const insertedAlert = await db.addAlert(insertedRecord.record_id, "dehydration", "email");
                                     if (!insertedAlert) {
                                         console.error(`Failed to insert alert into database`, {
-                                            monitorID,
+                                            monitorID: resolvedMonitorID,
                                             recordID: insertedRecord.record_id,
                                         });
                                     }
                                 } else if (sentCount > 0) {
                                     console.error(`Alert sent but record reference missing; alert row not saved`, {
-                                        monitorID,
+                                        monitorID: resolvedMonitorID,
                                         imageName,
                                     });
                                 }
@@ -144,7 +140,7 @@ router.post(`/:monitorID`, async (req, res) => {
                         }
                     } catch (emailErr) {
                         console.error(`Alert email failed`, {
-                            monitorID,
+                            monitorID: resolvedMonitorID,
                             imageName,
                             score,
                             error: emailErr,
@@ -153,7 +149,7 @@ router.post(`/:monitorID`, async (req, res) => {
                 }
 
                 console.info(`Background analysis summary`, {
-                    monitorID,
+                    monitorID: resolvedMonitorID,
                     imageName,
                     cvSucceeded: analysis !== null,
                     geminiUsed: Boolean(analysis && analysis.llm_used),
@@ -163,7 +159,7 @@ router.post(`/:monitorID`, async (req, res) => {
                     dbInsertSucceeded: Boolean(insertedRecord),
                 });
             } catch (err) {
-                console.error(`Background image analysis failed`, { monitorID, imageName, error: err });
+                console.error(`Background image analysis failed`, { monitorID: resolvedMonitorID, imageName, error: err });
             }
         })();
 
@@ -172,6 +168,20 @@ router.post(`/:monitorID`, async (req, res) => {
     } else {
         return res.status(400).json({ "error": "An image was not sent" });
     }
+}
+
+router.post(`/`, async (req, res) => {
+    return handleRecordUpload(req, res, null);
+});
+
+router.post(`/:monitorID`, async (req, res) => {
+    const monitorID = parseInt(req.params.monitorID);
+
+    if (isNaN(monitorID)) {
+        return res.status(400).json({ "error": "Invalid Monitor ID" });
+    }
+
+    return handleRecordUpload(req, res, monitorID);
 });
 
 /*
