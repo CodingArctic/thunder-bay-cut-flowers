@@ -28,12 +28,8 @@ void logMsg(const String &msg) {
 // -------- Camera AF helper --------
 OV5640 ov5640;
 
-// -------- Server config --------
-String serverName = "thunderbay.webdev.gccis.rit.edu";
-String serverPath = "/api/record/1";
-const char* ssid     = SECRET_SSID;
-const char* password = SECRET_PASSWORD;
-const char* apiKey   = SECRET_API_KEY;
+
+
 
 // -------- Sleep config --------
 #define SLEEP_MINUTES 10
@@ -46,8 +42,17 @@ const char* tzEST = "EST5EDT,M3.2.0,M11.1.0";
 
 // -------- Sunrise/Sunset API --------
 const char* sunriseApiBase = "https://api.sunrise-sunset.org/json";
-const double LAT = 43.1566;
-const double LNG = -77.6088;
+
+
+const char* ssid       = SECRET_SSID;
+const char* password   = SECRET_PASSWORD;
+const char* apiKey     = SECRET_API_KEY;
+
+String serverName      = SECRET_SERVER_NAME;
+String serverPath      = SECRET_SERVER_PATH;
+
+const double LAT       = SECRET_LAT;
+const double LNG       = SECRET_LNG;
 
 // -------- Data --------
 struct SunTimes {
