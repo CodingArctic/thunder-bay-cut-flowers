@@ -77,7 +77,7 @@ export function Data() {
         <h1 className="text-2xl font-bold text-gray-800">DATA</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 ">
         {/* Data Overview */}
         <div className="space-y-6">
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
@@ -131,24 +131,8 @@ export function Data() {
         </div>
 
         {/* Photo and Health Score */}
-        <div className="space-y-6">
-          {/* Photo from Image/VIDEO Folder */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
-            <h2 className="text-sm font-bold text-gray-800 mb-3 bg-[#ffd9a3] inline-block px-3 py-1 rounded">
-              PHOTO FROM SELECTED RECORD
-            </h2>
-            {selectedRecord ? (
-              <img 
-                src={`/api/record/image/${selectedRecord.record_id}`}
-                alt="Flower photo"
-                className="w-full aspect-video object-contain bg-gray-100 rounded-lg"
-              />
-            ) : (
-              <div className="w-full aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
-                <span className="text-gray-500">No photo available</span>
-              </div>
-            )}
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
 
           {/* Overall Flower Health */}
           <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
@@ -157,7 +141,7 @@ export function Data() {
             </h2>
             
             <div className="bg-[#ffe4b8] rounded-lg p-6 text-center mt-4">
-              <div className="text-5xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
+              <div className="text-6xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
               <div className="flex items-center justify-center">
                 <div className="relative">
                   <svg width="100" height="100" viewBox="0 0 100 100">
@@ -188,6 +172,23 @@ export function Data() {
                 </div>
               </div>
             </div>
+          </div>
+          {/* Photo from Image/VIDEO Folder */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
+            <h2 className="text-sm font-bold text-gray-800 mb-3 bg-[#ffd9a3] inline-block px-3 py-1 rounded">
+              PHOTO FROM SELECTED RECORD
+            </h2>
+            {selectedRecord ? (
+              <img 
+                src={`/api/record/image/${selectedRecord.record_id}`}
+                alt="Flower photo"
+                className="w-full aspect-video object-contain bg-gray-100 rounded-lg"
+              />
+            ) : (
+              <div className="w-full aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
+                <span className="text-gray-500">No photo available</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
