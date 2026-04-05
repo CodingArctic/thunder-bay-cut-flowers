@@ -212,6 +212,86 @@ router.get(`/recent/:monitorID`, requireAuth, async (req, res) => {
 });
 
 /*
+    GET /api/record/range/:monitorID?start=&end=&aggregation=auto|raw|hour&maxPoints=
+    Returns records in a date/time range.
+    - raw: returns all points in range (chronological)
+    - hour: returns hourly aggregated points with average/min/max/sample_count
+    - auto (default): returns raw until point count exceeds maxPoints, then returns hour aggregates
+    Requires the authenticated user to be associated with the monitor.
+*/
+router.get(`/range/:monitorID`, requireAuth, async (req, res) => {
+    const monitorID = parseInt(req.params.monitorID);
+
+    if (isNaN(monitorID)) {
+        return res.status(400).json({ error: "Invalid Monitor ID" });
+    }
+
+    const startRaw = req.query.start;
+    const endRaw = req.query.end;
+
+    if (!startRaw || !endRaw) {
+        return res.status(400).json({ error: "start and end query parameters are required" });
+    }
+
+    const start = new Date(String(startRaw));
+    const end = new Date(String(endRaw));
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: "Invalid date/time format for start or end" });
+    }
+
+    if (start >= end) {
+        return res.status(400).json({ error: "start must be earlier than end" });
+    }
+
+    const requestedAggregation = String(req.query.aggregation || "auto").toLowerCase();
+    if (!["auto", "raw", "hour"].includes(requestedAggregation)) {
+        return res.status(400).json({ error: "aggregation must be one of: auto, raw, hour" });
+    }
+
+    const maxPoints = Number(req.query.maxPoints || 500);
+    if (!Number.isInteger(maxPoints) || maxPoints < 1 || maxPoints > 10000) {
+        return res.status(400).json({ error: "maxPoints must be an integer between 1 and 10000" });
+    }
+
+    let monitorExists = await db.monitorExists(monitorID);
+    if (!monitorExists) {
+        return res.status(404).json({ error: "Invalid Monitor ID" });
+    }
+
+    const canAccess = await db.userCanAccessMonitor(req.user.user_id, monitorID);
+    if (!canAccess) {
+        return res.status(403).json({ error: "You are not authorized to access this monitor" });
+    }
+
+    let effectiveAggregation = requestedAggregation;
+    if (requestedAggregation === "auto") {
+        const count = await db.countRecordsInRange(monitorID, start, end);
+        effectiveAggregation = count > maxPoints ? "hour" : "raw";
+    }
+
+    let records = null;
+    if (effectiveAggregation === "hour") {
+        records = await db.getHourlyAverageRecordsInRange(monitorID, start, end);
+    } else {
+        records = await db.getRecordsInRange(monitorID, start, end);
+    }
+
+    if (records === null) {
+        return res.status(500).json({ error: "Failed to query monitor records" });
+    }
+
+    return res.status(200).json({
+        monitorID,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        aggregation: effectiveAggregation,
+        pointCount: records.length,
+        data: records,
+    });
+});
+
+/*
     GET /api/record/image/:recordID
     Returns the image associated with a record.
     Requires the authenticated user to be associated with the record's monitor.
