@@ -191,6 +191,19 @@ async function getMonitorByApiKey(apiKey) {
 }
 
 /**
+ * Create a monitor with a provided API key
+ * @param {string} name - Human-readable monitor/device name
+ * @param {string} apiKey - Device API key
+ * @returns {Object|null} Monitor row or null on failure
+ */
+async function createMonitor(name, apiKey) {
+    return await insertData(`monitors`, {
+        name,
+        api_key: apiKey,
+    });
+}
+
+/**
  * Get a user by username
  * Used during login authentication
  * @param {string} username
@@ -373,6 +386,7 @@ module.exports = {
     addRecord,
     monitorExists,
     getMonitorByApiKey,
+    createMonitor,
     getUserByUsername,
     getUserByEmail,
     getUserById,
