@@ -8,10 +8,16 @@ const express = require(`express`),
 
 const { analyzeImage } = require('../scripts/cv_analyze.js');
 const { sendAlertEmail } = require('../services/email/mailer');
-/*
-    TODO:
-    - check an API key to ensure request is from an authorized device
-*/
+
+function getDeviceApiKey(req) {
+    const headerValue = req.get('x-device-api-key') || req.get('x-api-key');
+    if (!headerValue) {
+        return null;
+    }
+
+    const apiKey = String(headerValue).trim();
+    return apiKey.length > 0 ? apiKey : null;
+}
 
 router.post(`/:monitorID`, async (req, res) => {
     const monitorID = parseInt(req.params.monitorID);
@@ -20,9 +26,18 @@ router.post(`/:monitorID`, async (req, res) => {
         return res.status(400).json({ "error": "Invalid Monitor ID" });
     }
 
-    let monitorExists = await db.monitorExists(monitorID);
-    if (!monitorExists) {
-        return res.status(404).json({ "error": "Invalid Monitor ID" });
+    const deviceApiKey = getDeviceApiKey(req);
+    if (!deviceApiKey) {
+        return res.status(401).json({ "error": "Missing device API key" });
+    }
+
+    const monitor = await db.getMonitorByApiKey(deviceApiKey);
+    if (!monitor) {
+        return res.status(401).json({ "error": "Invalid device API key" });
+    }
+
+    if (monitor.monitor_id !== monitorID) {
+        return res.status(403).json({ "error": "API key is not authorized for this monitor" });
     }
 
     if (req.files && Object.keys(req.files).length !== 0) {
