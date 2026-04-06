@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
+import { use, useEffect, useState } from 'react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { apiRequest } from '../utils/api-request';
 
 interface MonitorSummary {
@@ -24,6 +24,11 @@ function getHealthEmoji(score: number): string {
   return '😞';  // Critical
 }
 
+//Function to convert format date string to ISO format for API queries
+function toISO(dateStr: string) {
+  return dateStr ? new Date(dateStr).toISOString() : '';
+}
+
 export function Dashboard() {
   const [error, setError] = useState('');
   const [monitorID, setMonitorID] = useState('');
@@ -31,6 +36,58 @@ export function Dashboard() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [latestRecordID, setLatestRecordID] = useState<number | null>(null);
   const [latestScore, setLatestScore] = useState<number>(0);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [aggregation, setAggregation] = useState<'auto' | 'raw' | 'hour'>('auto');
+
+  const fetchRangeData = async () => {
+    if (!monitorID || !startDate || !endDate) return;
+
+    try {
+      const query = new URLSearchParams({
+        start: toISO(startDate),
+        end: toISO(endDate),
+        aggregation,
+      });
+
+      const data = await apiRequest(
+        `/api/record/range/${monitorID}?${query.toString()}`,
+        'GET'
+      );
+
+      setChartData(Array.isArray(data) ? data : []);
+      if (Array.isArray(data) && data.length > 0) {
+          const latestRecord = data[data.length - 1];
+          setLatestRecordID(latestRecord.record_id);
+          setLatestScore(latestRecord.dehydration_score ?? latestRecord.avg ?? 0);
+        } else {
+          setLatestRecordID(null);
+          setLatestScore(0);
+        }
+    } catch (error: any) {
+      setError(error.message);
+    }
+  };
+  
+  // TESTING PURPOSES ONLY
+//   const fetchRangeData = async () => {
+//   // FAKE DATA
+//   const fakeData = Array.from({ length: 24 }).map((_, i) => ({
+//     time: new Date(Date.now() - (23 - i) * 3600000).toISOString(),
+//     dehydration_score: Math.random()
+//   }));
+
+//   setChartData(fakeData);
+// };
+
+  // TESTING PURPOSES ONLY
+// const fakeData = Array.from({ length: 24 }).map((_, i) => ({
+//   time: new Date(Date.now() - (23 - i) * 3600000).toISOString(),
+//   avg: Math.random(),
+//   min: Math.random() * 0.5,
+//   max: 0.5 + Math.random() * 0.5,
+//   sample_count: Math.floor(Math.random() * 10)
+// }));
 
   useEffect(() => {
     const fetchMonitors = async () => {
@@ -49,28 +106,40 @@ export function Dashboard() {
     fetchMonitors();
   }, []);
 
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     try {
+  //       const data = await apiRequest(`/api/record/recent/${monitorID}`, `GET`);
+  //       setChartData(Array.isArray(data) ? data : []);
+  //       // Set the latest record ID and score (last item in the array since API returns oldest first)
+  //       if (Array.isArray(data) && data.length > 0) {
+  //         const latestRecord = data[data.length - 1];
+  //         setLatestRecordID(latestRecord.record_id);
+  //         setLatestScore(latestRecord.dehydration_score);
+  //       } else {
+  //         setLatestRecordID(null);
+  //         setLatestScore(0);
+  //       }
+  //     } catch (error: any) {
+  //       setError(error.message);
+  //     }
+  //   };
+  //   if (monitorID) {
+  //     fetchData();
+  //   }
+  // }, [monitorID]);
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await apiRequest(`/api/record/recent/${monitorID}`, `GET`);
-        setChartData(Array.isArray(data) ? data : []);
-        // Set the latest record ID and score (last item in the array since API returns oldest first)
-        if (Array.isArray(data) && data.length > 0) {
-          const latestRecord = data[data.length - 1];
-          setLatestRecordID(latestRecord.record_id);
-          setLatestScore(latestRecord.dehydration_score);
-        } else {
-          setLatestRecordID(null);
-          setLatestScore(0);
-        }
-      } catch (error: any) {
-        setError(error.message);
-      }
-    };
-    if (monitorID) {
-      fetchData();
-    }
-  }, [monitorID]);
+  fetchRangeData();
+}, [monitorID, startDate, endDate, aggregation]);
+
+// TESTING PURPOSES ONLY
+// useEffect(() => {
+//   fakeData.forEach((item) => {
+//     item.time = new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+//   });
+//   setChartData(fakeData);
+// }, []);
 
   return (
     <div>
@@ -109,7 +178,7 @@ export function Dashboard() {
 
           <div className="mt-6">
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData}>
+              <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0d0d0" />
                 <XAxis 
                   dataKey="time" 
@@ -128,9 +197,45 @@ export function Dashboard() {
                   formatter={(value: any) => `${Math.round(value * 100)}%`}
                   labelFormatter={(label) => new Date(label).toLocaleString()}
                 />
-                <Bar dataKey="dehydration_score" fill="#ffa07a" radius={[4, 4, 0, 0]} />
-              </BarChart>
+                {/* <Bar dataKey="dehydration_score" fill="#ffa07a" radius={[4, 4, 0, 0]} /> */}
+                <Line type="monotone" dataKey={aggregation === 'hour' ? 'avg' : 'dehydration_score'} stroke="#ffa07a" strokeWidth={2} dot={false}/>
+              </LineChart>
             </ResponsiveContainer>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div>
+              <label className="block text-sm mb-1">Start Date</label>
+              <input
+                // type="datetime-local"
+                type="datetime-local"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full border px-2 py-1 rounded"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">End Date</label>
+              <input
+                type="datetime-local"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full border px-2 py-1 rounded"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Aggregation</label>
+              <select
+                value={aggregation}
+                onChange={(e) => setAggregation(e.target.value as any)}
+                className="w-full border px-2 py-1 rounded"
+              >
+                <option value="auto">Auto</option>
+                <option value="raw">Raw</option>
+                <option value="hour">Hourly</option>
+              </select>
+            </div>
+          </div>
           </div>
         </div>
 
