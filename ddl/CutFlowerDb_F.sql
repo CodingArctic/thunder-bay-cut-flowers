@@ -36,6 +36,8 @@ COMMENT ON TABLE monitors IS 'Stores monitoring devices';
 
 ALTER TABLE monitors OWNER TO flowers;
 
+CREATE INDEX idx_monitors_api_key ON monitors(api_key);
+
 -------------------------------------------------
 -- USERS_MONITORS (Many-to-Many)
 -------------------------------------------------

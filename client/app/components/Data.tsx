@@ -1,6 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../utils/api-request';
 
+interface MonitorSummary {
+  monitor_id: number;
+  name: string;
+}
+
+interface MonitorsResponse {
+  monitorIDs?: number[];
+  monitors?: MonitorSummary[];
+}
+
 const radius = 40;
 const circumference = 2 * Math.PI * radius;
 
@@ -16,19 +26,19 @@ function getHealthEmoji(score: number): string {
 export function Data() {
   const [error, setError] = useState('');
   const [monitorID, setMonitorID] = useState('');
-  const [monitorOptions, setMonitorOptions] = useState<number[]>([]);
+  const [monitorOptions, setMonitorOptions] = useState<MonitorSummary[]>([]);
   const [records, setRecords] = useState<any[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
 
   useEffect(() => {
     const fetchMonitors = async () => {
       try {
-        let response = await apiRequest(`/api/monitors/all`, `GET`) as { monitorIDs: number[] };
-        const monitors = response.monitorIDs || [];
+        const response = await apiRequest<MonitorsResponse>(`/api/monitors/all`, `GET`);
+        const monitors = response?.monitors || [];
         setMonitorOptions(monitors);
         // Set the first available monitor as default if not already set
         if (monitors.length > 0 && !monitorID) {
-          setMonitorID(String(monitors[0]));
+          setMonitorID(String(monitors[0].monitor_id));
         }
       } catch (error: any) {
         setError(error.message);
@@ -67,7 +77,7 @@ export function Data() {
         <h1 className="text-2xl font-bold text-gray-800">DATA</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 ">
         {/* Data Overview */}
         <div className="space-y-6">
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
@@ -86,9 +96,9 @@ export function Data() {
                 className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
               >
                 <option value="">-- Select a Monitor --</option>
-                {monitorOptions.map((id) => (
-                  <option key={id} value={id}>
-                    Monitor {id}
+                {monitorOptions.map((monitor) => (
+                  <option key={monitor.monitor_id} value={monitor.monitor_id}>
+                    {monitor.name} (ID {monitor.monitor_id})
                   </option>
                 ))}
               </select>
@@ -121,24 +131,8 @@ export function Data() {
         </div>
 
         {/* Photo and Health Score */}
-        <div className="space-y-6">
-          {/* Photo from Image/VIDEO Folder */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
-            <h2 className="text-sm font-bold text-gray-800 mb-3 bg-[#ffd9a3] inline-block px-3 py-1 rounded">
-              PHOTO FROM SELECTED RECORD
-            </h2>
-            {selectedRecord ? (
-              <img 
-                src={`/api/record/image/${selectedRecord.record_id}`}
-                alt="Flower photo"
-                className="w-full aspect-video object-contain bg-gray-100 rounded-lg"
-              />
-            ) : (
-              <div className="w-full aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
-                <span className="text-gray-500">No photo available</span>
-              </div>
-            )}
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
 
           {/* Overall Flower Health */}
           <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
@@ -147,7 +141,7 @@ export function Data() {
             </h2>
             
             <div className="bg-[#ffe4b8] rounded-lg p-6 text-center mt-4">
-              <div className="text-5xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
+              <div className="text-6xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
               <div className="flex items-center justify-center">
                 <div className="relative">
                   <svg width="100" height="100" viewBox="0 0 100 100">
@@ -178,6 +172,23 @@ export function Data() {
                 </div>
               </div>
             </div>
+          </div>
+          {/* Photo from Image/VIDEO Folder */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
+            <h2 className="text-sm font-bold text-gray-800 mb-3 bg-[#ffd9a3] inline-block px-3 py-1 rounded">
+              PHOTO FROM SELECTED RECORD
+            </h2>
+            {selectedRecord ? (
+              <img 
+                src={`/api/record/image/${selectedRecord.record_id}`}
+                alt="Flower photo"
+                className="w-full aspect-video object-contain bg-gray-100 rounded-lg"
+              />
+            ) : (
+              <div className="w-full aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
+                <span className="text-gray-500">No photo available</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { apiRequest } from '../utils/api-request';
 
+interface MonitorSummary {
+  monitor_id: number;
+  name: string;
+}
+
+interface MonitorsResponse {
+  monitorIDs?: number[];
+  monitors?: MonitorSummary[];
+}
+
 const radius = 50;
 const circumference = 2 * Math.PI * radius;
 
@@ -17,7 +27,7 @@ function getHealthEmoji(score: number): string {
 export function Dashboard() {
   const [error, setError] = useState('');
   const [monitorID, setMonitorID] = useState('');
-  const [monitorOptions, setMonitorOptions] = useState<number[]>([]);
+  const [monitorOptions, setMonitorOptions] = useState<MonitorSummary[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [latestRecordID, setLatestRecordID] = useState<number | null>(null);
   const [latestScore, setLatestScore] = useState<number>(0);
@@ -25,12 +35,12 @@ export function Dashboard() {
   useEffect(() => {
     const fetchMonitors = async () => {
       try {
-        let response = await apiRequest(`/api/monitors/all`, `GET`) as { monitorIDs: number[] };
-        const monitors = response.monitorIDs || [];
+        const response = await apiRequest<MonitorsResponse>(`/api/monitors/all`, `GET`);
+        const monitors = response?.monitors || [];
         setMonitorOptions(monitors);
         // Set the first available monitor as default if not already set
         if (monitors.length > 0 && !monitorID) {
-          setMonitorID(String(monitors[0]));
+          setMonitorID(String(monitors[0].monitor_id));
         }
       } catch (error: any) {
         setError(error.message);
@@ -71,7 +81,7 @@ export function Dashboard() {
         <h1 className="text-2xl font-bold text-gray-800">DASHBOARD</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Last Hour Overview */}
         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
@@ -89,9 +99,9 @@ export function Dashboard() {
               className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
             >
               <option value="">-- Select a Monitor --</option>
-              {monitorOptions.map((id) => (
-                <option key={id} value={id}>
-                  Monitor {id}
+              {monitorOptions.map((monitor) => (
+                <option key={monitor.monitor_id} value={monitor.monitor_id}>
+                  {monitor.name} (ID {monitor.monitor_id})
                 </option>
               ))}
             </select>
@@ -125,7 +135,7 @@ export function Dashboard() {
         </div>
 
         {/* Current Health Message */}
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
             <h2 className="text-lg font-bold text-gray-800 mb-6">CURRENT HEALTH MESSAGE</h2>
 
