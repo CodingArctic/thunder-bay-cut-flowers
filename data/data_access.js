@@ -359,7 +359,9 @@ async function getHourlyAverageRecordsInRange(monitorID, startTime, endTime) {
             AVG(dehydration_score)::double precision AS dehydration_score,
             MIN(dehydration_score)::double precision AS min_dehydration_score,
             MAX(dehydration_score)::double precision AS max_dehydration_score,
-            COUNT(*)::int AS sample_count
+                        COUNT(*)::int AS sample_count,
+                        (ARRAY_AGG(record_id ORDER BY time ASC))[1]::int AS first_record_id,
+                        (ARRAY_AGG(record_id ORDER BY time DESC))[1]::int AS latest_record_id
         FROM records
         WHERE monitor_id = $1
           AND time >= $2

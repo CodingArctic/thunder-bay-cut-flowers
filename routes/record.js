@@ -216,6 +216,7 @@ router.get(`/recent/:monitorID`, requireAuth, async (req, res) => {
     Returns records in a date/time range.
     - raw: returns all points in range (chronological)
     - hour: returns hourly aggregated points with average/min/max/sample_count
+      and representative record IDs (first_record_id/latest_record_id)
     - auto (default): returns raw until point count exceeds maxPoints, then returns hour aggregates
     Requires the authenticated user to be associated with the monitor.
 */
@@ -286,6 +287,7 @@ router.get(`/range/:monitorID`, requireAuth, async (req, res) => {
         start: start.toISOString(),
         end: end.toISOString(),
         aggregation: effectiveAggregation,
+        imageRecordField: effectiveAggregation === "hour" ? "first_record_id" : "record_id",
         pointCount: records.length,
         data: records,
     });
