@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../utils/api-request';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
+
 
 interface MonitorSummary {
   monitor_id: number;
@@ -126,6 +128,41 @@ export function Data() {
                   </span>
                 </div>
               ))}
+            </div>
+            <div className="mt-6">
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={records}
+                  onClick={(state: any) => {
+                    if (state && state.activePayload && state.activePayload.length > 0) {
+                      setSelectedRecord(state.activePayload[0].payload);
+                    }
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0d0d0" />
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(value) => {
+                      const date = new Date(value);
+                      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    }}
+                  />
+                  <YAxis
+                    domain={[0, 1]}
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(value) => `${Math.round(value * 100)}%`}
+                  />
+                  <Tooltip
+                    formatter={(value: any) => `${Math.round(value * 100)}%`}
+                    labelFormatter={(label) => new Date(label).toLocaleString()}
+                  />
+                  <Line type="monotone" dataKey="dehydration_score" stroke="#ff6b6b"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>
