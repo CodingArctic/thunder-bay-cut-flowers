@@ -13,6 +13,20 @@ interface MonitorsResponse {
   monitors?: MonitorSummary[];
 }
 
+interface RangeRecord {
+  record_id?: number;
+  first_record_id?: number;
+  latest_record_id?: number;
+  time: string;
+  dehydration_score: number;
+}
+
+interface RangeResponse {
+  aggregation: 'raw' | 'hour';
+  imageRecordField?: 'record_id' | 'first_record_id' | 'latest_record_id';
+  data: RangeRecord[];
+}
+
 const radius = 40;
 const circumference = 2 * Math.PI * radius;
 
