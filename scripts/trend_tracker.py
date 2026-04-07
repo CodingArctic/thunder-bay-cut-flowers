@@ -161,7 +161,7 @@ def analyze_trends(zone_results, min_entries=3):
     # Calculate penalty based on how many zones are declining
     plant_zones = [r for r in zone_results if r["category"] != "no_plant"]
     if plant_zones and declining_zones > 0:
-        trend_penalty = (declining_zones / len(plant_zones)) * 0.15
+        trend_penalty = (declining_zones / len(plant_zones)) * 0.10
     else:
         trend_penalty = 0.0
 

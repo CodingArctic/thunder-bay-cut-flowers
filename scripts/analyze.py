@@ -196,7 +196,7 @@ def analyze(image_path):
     trend_penalty = trend_data["trend_penalty"]
 
     if llm_score is not None:
-        combined = float(round(cv_score * 0.6 + llm_score * 0.4, 4))
+        combined = float(round(cv_score * 0.3 + llm_score * 0.7, 4))
     else:
         combined = cv_score
 
