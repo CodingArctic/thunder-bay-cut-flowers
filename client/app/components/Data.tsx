@@ -194,28 +194,7 @@ export function Data() {
                   />
                 </div>
               </div>
-            <div className="mt-6 space-y-2 max-h-75 overflow-y-auto">
-              {records.map((record, index) => (
-                <div
-                  key={record.image_record_id || record.record_id || record.time}
-                  className={`flex justify-between text-sm py-2 px-3 rounded cursor-pointer hover:bg-[#ffd9a3]/30 transition-colors ${selectedRecord?.image_record_id === record.image_record_id ? 'bg-[#ffd9a3]/50' : ''
-                    }`}
-                  onClick={() => setSelectedRecord(record)}
-                >
-                  <span className="text-gray-600">
-                    {new Date(record.time).toLocaleString([], {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                  <span className="text-gray-800 font-medium">
-                    {Math.round(record.dehydration_score * 100)}%
-                  </span>
-                </div>
-              ))}
-            </div>
+            
             <div className="mt-6">
               {chartRecords.length ?
                 <ResponsiveContainer width="100%" height={250}>
@@ -253,6 +232,29 @@ export function Data() {
                 </ResponsiveContainer>
                 : <h1 className='text-gray-800 text-center m-auto mb-8'>No records, try another date range!</h1>
               }
+            </div>
+            
+            <div className="mt-6 space-y-2 max-h-75 overflow-y-auto">
+              {records.map((record, index) => (
+                <div
+                  key={record.image_record_id || record.record_id || record.time}
+                  className={`flex justify-between text-sm py-2 px-3 rounded cursor-pointer hover:bg-[#ffd9a3]/30 transition-colors ${selectedRecord?.image_record_id === record.image_record_id ? 'bg-[#ffd9a3]/50' : ''
+                    }`}
+                  onClick={() => setSelectedRecord(record)}
+                >
+                  <span className="text-gray-600">
+                    {new Date(record.time).toLocaleString([], {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                  <span className="text-gray-800 font-medium">
+                    {Math.round(record.dehydration_score * 100)}%
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
