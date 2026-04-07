@@ -150,7 +150,6 @@ export function Data() {
             <h2 className="text-lg font-bold text-gray-800 mb-4 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
               DATA OVERVIEW
             </h2>
-
             <div className="mb-4">
               <label htmlFor="monitor-select" className="block text-sm font-medium text-gray-700 mb-2">
                 Select Monitor:
@@ -169,7 +168,30 @@ export function Data() {
                 ))}
               </select>
             </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg"
+                  />
+                </div>
+              </div>
             <div className="mt-6 space-y-2 max-h-75 overflow-y-auto">
               {records.map((record, index) => (
                 <div
@@ -195,7 +217,6 @@ export function Data() {
             <div className="mt-6">
               {chartRecords.length ?
                 <ResponsiveContainer width="100%" height={250}>
-
                   <LineChart data={chartRecords}
                     onClick={(state: any) => {
                       if (state && state.activePayload && state.activePayload.length > 0) {
@@ -230,40 +251,11 @@ export function Data() {
                 </ResponsiveContainer>
                 : <h1 className='text-gray-800 text-center m-auto mb-8'>No records, try another date range!</h1>
               }
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg"
-                  />
-                </div>
-              </div>
-
             </div>
           </div>
         </div>
-
         {/* Photo and Health Score */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-
           {/* Overall Flower Health */}
           <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
             <h2 className="text-sm font-bold text-gray-800 mb-4 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
@@ -296,7 +288,7 @@ export function Data() {
                       transform="rotate(-90 50 50)"
                     />
                     <text x="50" y="58" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">
-                      {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : '0%'}
+                      {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : ''}
                     </text>
                   </svg>
                 </div>
