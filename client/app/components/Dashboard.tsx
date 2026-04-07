@@ -165,7 +165,7 @@ export function Dashboard() {
                       transform="rotate(-90 60 60)"
                     />
                     <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
-                      {Math.round(latestScore * 100)}%
+                      {latestScore ? `${Math.round(latestScore * 100)}%` : ''}
                     </text>
                   </svg>
                 </div>
