@@ -52,7 +52,7 @@ export function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await apiRequest(`/api/record/recent/${monitorID}`, `GET`);
+        const data = await apiRequest(`/api/record/recent/${monitorID}?limit=12`, `GET`);
         setChartData(Array.isArray(data) ? data : []);
         // Set the latest record ID and score (last item in the array since API returns oldest first)
         if (Array.isArray(data) && data.length > 0) {
@@ -82,29 +82,30 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {/* Last Hour Overview */}
+        {/* Recent Data Overview */}
         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
-            LAST HOUR OVERVIEW
+            LAST 2 HOURS
           </h2>
-
           <div className="mb-4">
             <label htmlFor="monitor-select" className="block text-sm font-medium text-gray-700 mb-2">
               Select Monitor:
             </label>
-            <select
-              id="monitor-select"
-              value={monitorID}
-              onChange={(e) => setMonitorID(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
-            >
-              <option value="">-- Select a Monitor --</option>
-              {monitorOptions.map((monitor) => (
-                <option key={monitor.monitor_id} value={monitor.monitor_id}>
-                  {monitor.name} (ID {monitor.monitor_id})
-                </option>
-              ))}
-            </select>
+            <div className="w-full max-w-sm">
+              <select
+                id="monitor-select"
+                value={monitorID}
+                onChange={(e) => setMonitorID(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
+              >
+                <option value="">-- Select a Monitor --</option>
+                {monitorOptions.map((monitor) => (
+                  <option key={monitor.monitor_id} value={monitor.monitor_id}>
+                    {monitor.name} (ID {monitor.monitor_id})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="mt-6">
@@ -165,7 +166,7 @@ export function Dashboard() {
                       transform="rotate(-90 60 60)"
                     />
                     <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
-                      {Math.round(latestScore * 100)}%
+                      {latestScore ? `${Math.round(latestScore * 100)}%` : ''}
                     </text>
                   </svg>
                 </div>
