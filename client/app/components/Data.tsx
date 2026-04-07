@@ -27,7 +27,7 @@ interface RangeResponse {
   data: RangeRecord[];
 }
 
-const radius = 40;
+const radius = 50;
 const circumference = 2 * Math.PI * radius;
 
 // Helper function to get emoji based on health score
@@ -133,7 +133,10 @@ export function Data() {
     }
   }, [monitorID, startDate, endDate]);
 
-  const progress = selectedRecord ? selectedRecord.dehydration_score : 0;
+  const progress = Math.min(
+    1,
+    Math.max(0, Number(selectedRecord?.dehydration_score ?? 0))
+  );
   return (
     <div>
       <div className="flex items-center gap-2 mb-8">
@@ -261,40 +264,42 @@ export function Data() {
         {/* Photo and Health Score */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Overall Flower Health */}
-          <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
-            <h2 className="text-sm font-bold text-gray-800 mb-4 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
+          <div className="bg-[#ffd9a3] rounded-lg pt-6 px-6 pb-4 shadow-sm flex flex-col">
+            <h2 className="text-sm font-bold text-gray-800 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
               FLOWER HEALTH AT SELECTED TIME
             </h2>
 
-            <div className="bg-[#ffe4b8] rounded-lg p-6 text-center mt-4">
-              <div className="text-6xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
-              <div className="flex items-center justify-center">
-                <div className="relative">
-                  <svg width="100" height="100" viewBox="0 0 100 100">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="#ffd9a3"
-                      strokeWidth="8"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="#ff6b6b"
-                      strokeWidth="8"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={circumference * (1 - progress)}
-                      strokeLinecap="butt"
-                      transform="rotate(-90 50 50)"
-                    />
-                    <text x="50" y="58" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">
-                      {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : ''}
-                    </text>
-                  </svg>
+            <div className="flex-1 flex items-center py-4">
+              <div className="bg-[#ffe4b8] border border-[#f2c27d] rounded-lg p-6 text-center w-full">
+                <div className="flex items-center justify-center gap-6">
+                  <div className="text-8xl leading-none">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
+                  <div className="relative">
+                    <svg width="120" height="120" viewBox="0 0 120 120">
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="50"
+                        fill="none"
+                        stroke="#ffd9a3"
+                        strokeWidth="10"
+                      />
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="50"
+                        fill="none"
+                        stroke="#ff6b6b"
+                        strokeWidth="10"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={circumference * (1 - progress)}
+                        strokeLinecap="butt"
+                        transform="rotate(-90 60 60)"
+                      />
+                      <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
+                        {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : ''}
+                      </text>
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>

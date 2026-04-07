@@ -31,6 +31,8 @@ export function Dashboard() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [latestRecordID, setLatestRecordID] = useState<number | null>(null);
   const [latestScore, setLatestScore] = useState<number>(0);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
+  const [hasLoadedData, setHasLoadedData] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchMonitors = async () => {
@@ -51,6 +53,7 @@ export function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoadingData(true);
       try {
         const data = await apiRequest(`/api/record/recent/${monitorID}?limit=12`, `GET`);
         setChartData(Array.isArray(data) ? data : []);
@@ -65,12 +68,18 @@ export function Dashboard() {
         }
       } catch (error: any) {
         setError(error.message);
+      } finally {
+        setIsLoadingData(false);
+        setHasLoadedData(true);
       }
     };
     if (monitorID) {
       fetchData();
     }
   }, [monitorID]);
+
+  const showNeutralHealthState = !hasLoadedData || isLoadingData;
+  const healthEmoji = showNeutralHealthState ? '😐' : getHealthEmoji(latestScore);
 
   return (
     <div>
@@ -137,38 +146,40 @@ export function Dashboard() {
 
         {/* Current Health Message */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-gray-800 mb-6">CURRENT HEALTH MESSAGE</h2>
+          <div className="bg-[#ffd9a3] rounded-lg pt-6 px-6 pb-4 shadow-sm flex flex-col">
+            <h2 className="text-lg font-bold text-gray-800">CURRENT HEALTH MESSAGE</h2>
 
-            <div className="bg-[#ffe4b8] rounded-lg p-8 text-center">
-              <div className="text-6xl mb-4">{getHealthEmoji(latestScore)}</div>
-              <div className="flex items-center justify-center">
-                <div className="relative">
-                  <svg width="120" height="120" viewBox="0 0 120 120">
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r="50"
-                      fill="none"
-                      stroke="#ffd9a3"
-                      strokeWidth="10"
-                    />
-                    <circle
-                      cx="60"
-                      cy="60"
-                      r="50"
-                      fill="none"
-                      stroke="#ff6b6b"
-                      strokeWidth="10"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={circumference * (1 - latestScore)}
-                      strokeLinecap="butt"
-                      transform="rotate(-90 60 60)"
-                    />
-                    <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
-                      {latestScore ? `${Math.round(latestScore * 100)}%` : ''}
-                    </text>
-                  </svg>
+            <div className="flex-1 flex items-center py-4">
+              <div className="bg-[#ffe4b8] border border-[#f2c27d] rounded-lg p-6 text-center w-full">
+                <div className="flex items-center justify-center gap-6">
+                  <div className="text-8xl leading-none">{healthEmoji}</div>
+                  <div className="relative">
+                    <svg width="120" height="120" viewBox="0 0 120 120">
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="50"
+                        fill="none"
+                        stroke="#ffd9a3"
+                        strokeWidth="10"
+                      />
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="50"
+                        fill="none"
+                        stroke="#ff6b6b"
+                        strokeWidth="10"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={circumference * (1 - latestScore)}
+                        strokeLinecap="butt"
+                        transform="rotate(-90 60 60)"
+                      />
+                      <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
+                        {latestScore ? `${Math.round(latestScore * 100)}%` : ''}
+                      </text>
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>
