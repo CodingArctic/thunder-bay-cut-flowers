@@ -52,7 +52,7 @@ export function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await apiRequest(`/api/record/recent/${monitorID}`, `GET`);
+        const data = await apiRequest(`/api/record/recent/${monitorID}?limit=12`, `GET`);
         setChartData(Array.isArray(data) ? data : []);
         // Set the latest record ID and score (last item in the array since API returns oldest first)
         if (Array.isArray(data) && data.length > 0) {
@@ -82,12 +82,11 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {/* Last Hour Overview */}
+        {/* Recent Data Overview */}
         <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
-            LAST HOUR OVERVIEW
+            LAST 2 HOURS
           </h2>
-
           <div className="mb-4">
             <label htmlFor="monitor-select" className="block text-sm font-medium text-gray-700 mb-2">
               Select Monitor:
