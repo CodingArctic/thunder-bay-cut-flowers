@@ -154,19 +154,21 @@ export function Data() {
               <label htmlFor="monitor-select" className="block text-sm font-medium text-gray-700 mb-2">
                 Select Monitor:
               </label>
-              <select
-                id="monitor-select"
-                value={monitorID}
-                onChange={(e) => setMonitorID(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
-              >
-                <option value="">-- Select a Monitor --</option>
-                {monitorOptions.map((monitor) => (
-                  <option key={monitor.monitor_id} value={monitor.monitor_id}>
-                    {monitor.name} (ID {monitor.monitor_id})
-                  </option>
-                ))}
-              </select>
+              <div className="w-full max-w-sm">
+                <select
+                  id="monitor-select"
+                  value={monitorID}
+                  onChange={(e) => setMonitorID(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
+                >
+                  <option value="">-- Select a Monitor --</option>
+                  {monitorOptions.map((monitor) => (
+                    <option key={monitor.monitor_id} value={monitor.monitor_id}>
+                      {monitor.name} (ID {monitor.monitor_id})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
