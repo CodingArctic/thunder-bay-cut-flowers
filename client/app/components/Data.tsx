@@ -25,6 +25,12 @@ function getHealthEmoji(score: number): string {
   return '😞';  // Critical
 }
 
+function toLocalISOString(dateString: string) {
+  const date = new Date(dateString);
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffset).toISOString();
+}
+
 export function Data() {
   const [error, setError] = useState('');
   const [monitorID, setMonitorID] = useState('');
@@ -32,6 +38,26 @@ export function Data() {
   const [records, setRecords] = useState<any[]>([]);
   const [chartRecords, setChartRecords] = useState<any[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
+  const [aggregation, setAggregation] = useState<'auto' | 'raw' | 'hour'>('auto');
+
+  // const [startDate, setStartDate] = useState<string>('');
+  // const [endDate, setEndDate] = useState<string>('');
+  function toLocalDatetimeInput(date: Date) {
+    const offset = date.getTimezoneOffset();
+    const local = new Date(date.getTime() - offset * 60000);
+    return local.toISOString().slice(0, 16);
+  }
+
+  const [startDate, setStartDate] = useState(() => {
+    const now = new Date();
+    const past = new Date();
+    past.setDate(now.getDate() - 1);
+    return toLocalDatetimeInput(past);
+  });
+
+  const [endDate, setEndDate] = useState(() => {
+    return toLocalDatetimeInput(new Date());
+  });
 
   useEffect(() => {
     const fetchMonitors = async () => {
@@ -52,29 +78,47 @@ export function Data() {
 
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        const data = await apiRequest(`/api/record/recent/${monitorID}?limit=20`, `GET`);
-        if (Array.isArray(data)) {
-        const chronological = [...data]; // original order for chart
-        const reversed = [...data].reverse(); // newest first for list
+    try {
+      const params = new URLSearchParams({
+        start: toLocalISOString(startDate),
+        end: toLocalISOString(endDate),
+        aggregation: 'auto',
+        maxPoints: '40',
+      });
 
-        setChartRecords(chronological);
-        setRecords(reversed);
+      const data = await apiRequest(
+        `/api/record/${monitorID}?${params.toString()}`,
+        'GET'
+      );
 
-        setSelectedRecord(reversed[0] || null); 
-          } else {
-            setChartRecords([]);
-            setRecords([]);
-            setSelectedRecord(null);
-          }
-        } catch (error: any) {
-          setError(error.message);
-        }
-      };
-    if (monitorID) {
-      fetchData();
+      // const { aggregation, data } = response;
+      setAggregation(aggregation);
+
+      if (!Array.isArray(data)) {
+        setChartRecords([]);
+        setRecords([]);
+        setSelectedRecord(null);
+        return;
+      }
+
+      // Normalize data depending on aggregation
+      const normalized = data.map((item: any) => ({
+        ...item,
+        time: item.time || item.timestamp, // depends on backend
+      }));
+
+      setChartRecords(normalized);
+      setRecords([...normalized].reverse());
+      setSelectedRecord(normalized[normalized.length - 1] || null);
+
+    } catch (error: any) {
+      setError(error.message);
     }
-  }, [monitorID]);
+  };
+    if (monitorID && startDate && endDate) {
+    fetchData();
+  }
+}, [monitorID, startDate, endDate]);
 
   const progress = selectedRecord ? selectedRecord.dehydration_score : 0;
   return (
@@ -116,7 +160,8 @@ export function Data() {
             <div className="mt-6 space-y-2 max-h-[300px] overflow-y-auto">
               {records.map((record, index) => (
                 <div 
-                  key={record.record_id} 
+                  // key={record.record_id} 
+                  key={record.record_id || record.time}
                   className={`flex justify-between text-sm py-2 px-3 rounded cursor-pointer hover:bg-[#ffd9a3]/30 transition-colors ${
                     selectedRecord?.record_id === record.record_id ? 'bg-[#ffd9a3]/50' : ''
                   }`}
@@ -170,6 +215,33 @@ export function Data() {
                   />
                 </LineChart>
               </ResponsiveContainer>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+              </div>
+              
             </div>
           </div>
         </div>
