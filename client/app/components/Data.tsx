@@ -40,9 +40,7 @@ function getHealthEmoji(score: number): string {
 }
 
 function toLocalISOString(dateString: string) {
-  const date = new Date(dateString);
-  const tzOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - tzOffset).toISOString();
+  return new Date(dateString).toISOString();
 }
 
 export function Data() {
@@ -92,47 +90,48 @@ export function Data() {
 
   useEffect(() => {
     const fetchData = async () => {
-    try {
-      const params = new URLSearchParams({
-        start: toLocalISOString(startDate),
-        end: toLocalISOString(endDate),
-        aggregation: 'auto',
-        maxPoints: '40',
-      });
+      try {
+        const params = new URLSearchParams({
+          start: toLocalISOString(startDate),
+          end: toLocalISOString(endDate),
+          aggregation: 'auto',
+          maxPoints: '40',
+        });
 
-      const data = await apiRequest(
-        `/api/record/${monitorID}?${params.toString()}`,
-        'GET'
-      );
+        const response = await apiRequest<RangeResponse>(
+          `/api/record/range/${monitorID}?${params.toString()}`,
+          'GET'
+        );
 
-      // const { aggregation, data } = response;
-      setAggregation(aggregation);
+        if (!response || !Array.isArray(response.data)) {
+          setChartRecords([]);
+          setRecords([]);
+          setSelectedRecord(null);
+          return;
+        }
 
-      if (!Array.isArray(data)) {
-        setChartRecords([]);
-        setRecords([]);
-        setSelectedRecord(null);
-        return;
+        setAggregation(response.aggregation);
+        const imageField = response.imageRecordField || (response.aggregation === 'hour' ? 'first_record_id' : 'record_id');
+
+        // Normalize data depending on aggregation
+        const normalized = response.data.map((item: RangeRecord) => ({
+          ...item,
+          time: item.time,
+          image_record_id: (item as any)[imageField] || item.record_id || item.first_record_id || item.latest_record_id || null,
+        }));
+
+        setChartRecords(normalized);
+        setRecords([...normalized].reverse());
+        setSelectedRecord(normalized[normalized.length - 1] || null);
+
+      } catch (error: any) {
+        setError(error.message);
       }
-
-      // Normalize data depending on aggregation
-      const normalized = data.map((item: any) => ({
-        ...item,
-        time: item.time || item.timestamp, // depends on backend
-      }));
-
-      setChartRecords(normalized);
-      setRecords([...normalized].reverse());
-      setSelectedRecord(normalized[normalized.length - 1] || null);
-
-    } catch (error: any) {
-      setError(error.message);
-    }
-  };
+    };
     if (monitorID && startDate && endDate) {
-    fetchData();
-  }
-}, [monitorID, startDate, endDate]);
+      fetchData();
+    }
+  }, [monitorID, startDate, endDate]);
 
   const progress = selectedRecord ? selectedRecord.dehydration_score : 0;
   return (
@@ -151,7 +150,7 @@ export function Data() {
             <h2 className="text-lg font-bold text-gray-800 mb-4 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
               DATA OVERVIEW
             </h2>
-            
+
             <div className="mb-4">
               <label htmlFor="monitor-select" className="block text-sm font-medium text-gray-700 mb-2">
                 Select Monitor:
@@ -171,22 +170,20 @@ export function Data() {
               </select>
             </div>
 
-            <div className="mt-6 space-y-2 max-h-[300px] overflow-y-auto">
+            <div className="mt-6 space-y-2 max-h-75 overflow-y-auto">
               {records.map((record, index) => (
-                <div 
-                  // key={record.record_id} 
-                  key={record.record_id || record.time}
-                  className={`flex justify-between text-sm py-2 px-3 rounded cursor-pointer hover:bg-[#ffd9a3]/30 transition-colors ${
-                    selectedRecord?.record_id === record.record_id ? 'bg-[#ffd9a3]/50' : ''
-                  }`}
+                <div
+                  key={record.image_record_id || record.record_id || record.time}
+                  className={`flex justify-between text-sm py-2 px-3 rounded cursor-pointer hover:bg-[#ffd9a3]/30 transition-colors ${selectedRecord?.image_record_id === record.image_record_id ? 'bg-[#ffd9a3]/50' : ''
+                    }`}
                   onClick={() => setSelectedRecord(record)}
                 >
                   <span className="text-gray-600">
-                    {new Date(record.time).toLocaleString([], { 
-                      month: 'short', 
+                    {new Date(record.time).toLocaleString([], {
+                      month: 'short',
                       day: 'numeric',
-                      hour: '2-digit', 
-                      minute: '2-digit' 
+                      hour: '2-digit',
+                      minute: '2-digit'
                     })}
                   </span>
                   <span className="text-gray-800 font-medium">
@@ -196,40 +193,43 @@ export function Data() {
               ))}
             </div>
             <div className="mt-6">
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chartRecords}
-                  onClick={(state: any) => {
-                    if (state && state.activePayload && state.activePayload.length > 0) {
-                      setSelectedRecord(state.activePayload[0].payload);
-                    }
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0d0d0" />
-                  <XAxis
-                    dataKey="time"
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(value) => {
-                      const date = new Date(value);
-                      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    }}
-                  />
-                  <YAxis
-                    domain={[0, 1]}
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(value) => `${Math.round(value * 100)}%`}
-                  />
-                  <Tooltip
-                    formatter={(value: any) => `${Math.round(value * 100)}%`}
-                    labelFormatter={(label) => new Date(label).toLocaleString()}
-                  />
-                  <Line type="monotone" dataKey="dehydration_score" stroke="#ff6b6b"
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {chartRecords.length ?
+                <ResponsiveContainer width="100%" height={250}>
 
+                  <LineChart data={chartRecords}
+                    onClick={(state: any) => {
+                      if (state && state.activePayload && state.activePayload.length > 0) {
+                        setSelectedRecord(state.activePayload[0].payload);
+                      }
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0d0d0" />
+                    <XAxis
+                      dataKey="time"
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      }}
+                    />
+                    <YAxis
+                      domain={[0, 1]}
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(value) => `${Math.round(value * 100)}%`}
+                    />
+                    <Tooltip
+                      formatter={(value: any) => `${Math.round(value * 100)}%`}
+                      labelFormatter={(label) => new Date(label).toLocaleString()}
+                    />
+                    <Line type="monotone" dataKey="dehydration_score" stroke="#ff6b6b"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+                : <h1 className='text-gray-800 text-center m-auto mb-8'>No records, try another date range!</h1>
+              }
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -239,7 +239,7 @@ export function Data() {
                     type="datetime-local"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg"
                   />
                 </div>
 
@@ -251,25 +251,25 @@ export function Data() {
                     type="datetime-local"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg"
                   />
                 </div>
               </div>
-              
+
             </div>
           </div>
         </div>
 
         {/* Photo and Health Score */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
+
 
           {/* Overall Flower Health */}
           <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
             <h2 className="text-sm font-bold text-gray-800 mb-4 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
               FLOWER HEALTH AT SELECTED TIME
             </h2>
-            
+
             <div className="bg-[#ffe4b8] rounded-lg p-6 text-center mt-4">
               <div className="text-6xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
               <div className="flex items-center justify-center">
@@ -303,14 +303,14 @@ export function Data() {
               </div>
             </div>
           </div>
-          {/* Photo from Image/VIDEO Folder */}
+          {/* Photo from Image Folder */}
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 shadow-sm">
             <h2 className="text-sm font-bold text-gray-800 mb-3 bg-[#ffd9a3] inline-block px-3 py-1 rounded">
               PHOTO FROM SELECTED RECORD
             </h2>
             {selectedRecord ? (
-              <img 
-                src={`/api/record/image/${selectedRecord.record_id}`}
+              <img
+                src={`/api/record/image/${selectedRecord.image_record_id}`}
                 alt="Flower photo"
                 className="w-full aspect-video object-contain bg-gray-100 rounded-lg"
               />
