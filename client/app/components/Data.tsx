@@ -30,6 +30,7 @@ export function Data() {
   const [monitorID, setMonitorID] = useState('');
   const [monitorOptions, setMonitorOptions] = useState<MonitorSummary[]>([]);
   const [records, setRecords] = useState<any[]>([]);
+  const [chartRecords, setChartRecords] = useState<any[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
 
   useEffect(() => {
@@ -53,17 +54,23 @@ export function Data() {
     const fetchData = async () => {
       try {
         const data = await apiRequest(`/api/record/recent/${monitorID}?limit=20`, `GET`);
-        setRecords(Array.isArray(data) ? data.reverse() : []);
-        // Set the first record as selected by default
-        if (Array.isArray(data) && data.length > 0) {
-          setSelectedRecord(data[0]);
-        } else {
-          setSelectedRecord(null);
+        if (Array.isArray(data)) {
+        const chronological = [...data]; // original order for chart
+        const reversed = [...data].reverse(); // newest first for list
+
+        setChartRecords(chronological);
+        setRecords(reversed);
+
+        setSelectedRecord(reversed[0] || null); 
+          } else {
+            setChartRecords([]);
+            setRecords([]);
+            setSelectedRecord(null);
+          }
+        } catch (error: any) {
+          setError(error.message);
         }
-      } catch (error: any) {
-        setError(error.message);
-      }
-    };
+      };
     if (monitorID) {
       fetchData();
     }
@@ -106,7 +113,7 @@ export function Data() {
               </select>
             </div>
 
-            <div className="mt-6 space-y-2 max-h-[400px] overflow-y-auto">
+            <div className="mt-6 space-y-2 max-h-[300px] overflow-y-auto">
               {records.map((record, index) => (
                 <div 
                   key={record.record_id} 
@@ -131,7 +138,7 @@ export function Data() {
             </div>
             <div className="mt-6">
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={records}
+                <LineChart data={chartRecords}
                   onClick={(state: any) => {
                     if (state && state.activePayload && state.activePayload.length > 0) {
                       setSelectedRecord(state.activePayload[0].payload);
