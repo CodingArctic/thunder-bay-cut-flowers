@@ -7,7 +7,7 @@ const CV_SCRIPT = path.join(__dirname, '..', 'scripts', 'analyze.py');
 const CV_TIMEOUT_MS = Number.parseInt(process.env.CV_TIMEOUT_MS || '60000', 10);
 
 function resolvePythonPath() {
-    if (process.env.PYTHON_PATH) {
+    if (process.env.PYTHON_PATH) {    
         return process.env.PYTHON_PATH;
     }
 

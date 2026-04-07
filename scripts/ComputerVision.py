@@ -73,6 +73,13 @@ class CVScorer:
         self.baselines = {}
         self.baseline_colors = {}
         self.baseline_times = {}
+        self.zone_adjustments = {}
+
+    def set_zone_adjustments(self, adjustments):
+        """Set per-zone severity multipliers from trend history.
+        adjustments: dict of zone_id -> float (1.0 = normal, >1.0 = harsher)
+        """
+        self.zone_adjustments = adjustments
 
     def set_baseline(self, zone_id, image):
         self.baselines[zone_id] = image.copy()
@@ -84,8 +91,9 @@ class CVScorer:
     def score(self, zone_id, image):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         cur = self._color_ratios(hsv)
-        
-        abs_score, abs_cat = self._absolute_score(cur)
+        severity = self.zone_adjustments.get(zone_id, 1.0)
+
+        abs_score, abs_cat = self._absolute_score(cur, severity)
 
         if zone_id not in self.baselines:
             self.set_baseline(zone_id, image)
@@ -102,8 +110,8 @@ class CVScorer:
 
         green_ret = min(1.0, cur["green"] / base_colors["green"]) if base_colors["green"] > 0.01 else 1.0
         pigment_ret = min(1.0, cur["pigment"] / base_colors["pigment"]) if base_colors["pigment"] > 0.01 else 1.0
-        brown_pen = min(1.0, max(0, cur["brown"] - base_colors["brown"]) / 0.20)
-        yellow_pen = min(1.0, max(0, cur["yellow"] - base_colors["yellow"]) / 0.30)
+        brown_pen = min(1.0, max(0, cur["brown"] - base_colors["brown"]) / (0.20 / severity))
+        yellow_pen = min(1.0, max(0, cur["yellow"] - base_colors["yellow"]) / (0.30 / severity))
         hist_sim = self._hist_sim(base_hsv, hsv)
         texture_sim = self._ssim(baseline, image)
         spot_score = self._spot_detect(baseline, image)
@@ -144,29 +152,32 @@ class CVScorer:
                                        spot_score=spot_score)
         return health, cat, details
 
-    def _absolute_score(self, color_ratios):
+    def _absolute_score(self, color_ratios, severity=1.0):
         g = color_ratios["green"]
         b = color_ratios["brown"]
         y = color_ratios["yellow"]
-        pigment = color_ratios["pigment"]  
-        plant_coverage = pigment + b + y   
+        pigment = color_ratios["pigment"]
+        gq = color_ratios["green_quality"]
+        plant_coverage = pigment + b + y
 
         if plant_coverage < 0.20:
             if plant_coverage < 0.08:
                 return 0.0, "no_plant"
             elif (b + y) < 0.04 and pigment < 0.12:
                 return 0.0, "no_plant"
-            
+
         pigment_score = min(1.0, pigment / 0.35)
-        brown_penalty = min(1.0, b / 0.10)
-        yellow_penalty = min(1.0, y / 0.20)
+        # Severity from trend history makes brown/yellow thresholds tighter
+        brown_penalty = min(1.0, b / (0.05 / severity))
+        yellow_penalty = min(1.0, y / (0.20 / severity))
         coverage_score = min(1.0, plant_coverage / 0.20)
 
         score = (
-            pigment_score * 0.45 +
-            (1.0 - brown_penalty) * 0.25 +
+            pigment_score * 0.30 +
+            gq * 0.15 +
+            (1.0 - brown_penalty) * 0.35 +
             (1.0 - yellow_penalty) * 0.10 +
-            coverage_score * 0.20
+            coverage_score * 0.10
         )
         score = max(0.0, min(1.0, score))
 
@@ -189,6 +200,7 @@ class CVScorer:
         """Build details dict for a scored zone."""
         details = {
             "green_pct": round(cur["green"] * 100, 1),
+            "green_quality_pct": round(cur["green_quality"] * 100, 1),
             "red_pct": round(cur["red"] * 100, 1),
             "magenta_pct": round(cur["magenta"] * 100, 1),
             "purple_pct": round(cur["purple"] * 100, 1),
@@ -222,22 +234,31 @@ class CVScorer:
 
     def _color_ratios(self, hsv):
         t = hsv.shape[0] * hsv.shape[1]
-        g = np.sum(cv2.inRange(hsv, np.array([25, 40, 40]), np.array([85, 255, 255])) > 0) / t
+        green_mask = cv2.inRange(hsv, np.array([25, 40, 40]), np.array([85, 255, 255]))
+        g = np.sum(green_mask > 0) / t
         purple = np.sum(cv2.inRange(hsv, np.array([120, 30, 30]), np.array([140, 255, 255])) > 0) / t
         magenta = np.sum(cv2.inRange(hsv, np.array([140, 40, 40]), np.array([160, 255, 255])) > 0) / t
         red_hi = np.sum(cv2.inRange(hsv, np.array([160, 50, 40]), np.array([180, 255, 255])) > 0) / t
         red_lo = np.sum(cv2.inRange(hsv, np.array([0, 80, 40]), np.array([10, 255, 255])) > 0) / t
 
-        b = np.sum(cv2.inRange(hsv, np.array([0, 20, 20]), np.array([20, 80, 180])) > 0) / t
+        b = np.sum(cv2.inRange(hsv, np.array([5, 20, 30]), np.array([25, 180, 220])) > 0) / t
 
         y = np.sum(cv2.inRange(hsv, np.array([15, 40, 50]), np.array([25, 255, 255])) > 0) / t
 
         pigment = g + red_lo + red_hi + magenta + purple
 
+        green_quality = 1.0
+        green_pixels = hsv[green_mask > 0]
+        if len(green_pixels) > 100:
+            saturation_mean = np.mean(green_pixels[:, 1] >= 45)
+            value_mean = np.mean(green_pixels[:, 2] >= 100)
+            green_quality = (saturation_mean * 0.5 + value_mean * 0.5)
+            
         return {
             "green": g, "brown": b, "yellow": y,
             "red": red_lo + red_hi, "magenta": magenta, "purple": purple,
             "pigment": pigment,
+            "green_quality": green_quality,
         }
 
     def _hist_sim(self, h1, h2):
