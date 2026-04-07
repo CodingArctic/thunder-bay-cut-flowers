@@ -265,9 +265,7 @@ export function Data() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Overall Flower Health */}
           <div className="bg-[#ffd9a3] rounded-lg pt-6 px-6 pb-4 shadow-sm flex flex-col">
-            <h2 className="text-sm font-bold text-gray-800 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
-              FLOWER HEALTH AT SELECTED TIME
-            </h2>
+            <h2 className="text-lg font-bold text-gray-800">FLOWER HEALTH AT SELECTED TIME</h2>
 
             <div className="flex-1 flex items-center py-4">
               <div className="bg-[#ffe4b8] border border-[#f2c27d] rounded-lg p-6 text-center w-full">
