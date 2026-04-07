@@ -292,7 +292,7 @@ export function Settings() {
                   value={deviceApiKey}
                   onChange={(e) => setDeviceApiKey(e.target.value)}
                   placeholder="Paste device API key"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-700"
+                  className="w-full px-3 py-2 border border-gray-300 text-gray-700 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
                 />
                 <button
                   type="button"
@@ -310,7 +310,7 @@ export function Settings() {
                   value={createName}
                   onChange={(e) => setCreateName(e.target.value)}
                   placeholder="Device name (e.g. Greenhouse North Bench)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-700"
+                  className="w-full px-3 py-2 border border-gray-300 text-gray-700 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
                 />
                 <button
                   type="button"

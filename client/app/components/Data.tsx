@@ -159,7 +159,7 @@ export function Data() {
                   id="monitor-select"
                   value={monitorID}
                   onChange={(e) => setMonitorID(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg focus:ring-2 focus:ring-[#ffb84d] focus:border-transparent bg-white"
+                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
                 >
                   <option value="">-- Select a Monitor --</option>
                   {monitorOptions.map((monitor) => (
@@ -179,7 +179,7 @@ export function Data() {
                     type="datetime-local"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 text-gray-700 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
                   />
                 </div>
                 <div>
@@ -190,7 +190,7 @@ export function Data() {
                     type="datetime-local"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
                   />
                 </div>
               </div>
