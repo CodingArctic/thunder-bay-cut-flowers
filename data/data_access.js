@@ -97,10 +97,18 @@ async function insertData(table, data = {}) {
  * @returns {Object|null} Inserted record row or null on failure
  */
 async function addRecord(monitorID, value, imgName) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        console.error(`Invalid dehydration_score; expected finite numeric value`, { monitorID, value, imgName });
+        return null;
+    }
+
+    const boundedValue = Math.max(0, Math.min(1, numericValue));
+
     let newRecord = await insertData(`records`, {
         monitor_id: monitorID,
         time: new Date(),
-        dehydration_score: value,
+        dehydration_score: boundedValue,
         file_path: `/imgs/${monitorID}/${imgName}`
     });
     if (!newRecord) {

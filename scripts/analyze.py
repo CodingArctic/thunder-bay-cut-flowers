@@ -226,4 +226,20 @@ if __name__ == "__main__":
         print(json.dumps({"error": f"File not found: {image_path}"}))
         sys.exit(1)
 
-    print(json.dumps(analyze(image_path)))
+    try:
+        print(json.dumps(analyze(image_path)))
+    except Exception as e:
+        print(f"Error: analyze pipeline failed: {e}", file=sys.stderr)
+        print(json.dumps({
+            "score": None,
+            "cv_score": None,
+            "llm_score": None,
+            "llm_used": False,
+            "llm_status": "analysis_exception",
+            "llm_model": None,
+            "llm_raw": None,
+            "trend_penalty": 0.0,
+            "declining_zones": 0,
+            "zone_trends": {},
+            "error": str(e),
+        }))
