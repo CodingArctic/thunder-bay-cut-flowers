@@ -356,17 +356,26 @@ async function getHourlyAverageRecordsInRange(monitorID, startTime, endTime) {
     const text = `
         SELECT
             DATE_TRUNC('hour', time) AS time,
-            AVG(dehydration_score)::double precision AS dehydration_score,
-            MIN(dehydration_score)::double precision AS min_dehydration_score,
-            MAX(dehydration_score)::double precision AS max_dehydration_score,
-                        COUNT(*)::int AS sample_count,
-                        (ARRAY_AGG(record_id ORDER BY time ASC))[1]::int AS first_record_id,
-                        (ARRAY_AGG(record_id ORDER BY time DESC))[1]::int AS latest_record_id
+            AVG(dehydration_score) FILTER (WHERE dehydration_score > 0)::double precision AS dehydration_score,
+            MIN(dehydration_score) FILTER (WHERE dehydration_score > 0)::double precision AS min_dehydration_score,
+            MAX(dehydration_score) FILTER (WHERE dehydration_score > 0)::double precision AS max_dehydration_score,
+            COUNT(*) FILTER (WHERE dehydration_score > 0)::int AS sample_count,
+            COUNT(*)::int AS total_sample_count,
+            COUNT(*) FILTER (WHERE dehydration_score = 0)::int AS excluded_zero_count,
+            COALESCE(
+                (ARRAY_AGG(record_id ORDER BY time ASC) FILTER (WHERE dehydration_score > 0))[1],
+                (ARRAY_AGG(record_id ORDER BY time ASC))[1]
+            )::int AS first_record_id,
+            COALESCE(
+                (ARRAY_AGG(record_id ORDER BY time DESC) FILTER (WHERE dehydration_score > 0))[1],
+                (ARRAY_AGG(record_id ORDER BY time DESC))[1]
+            )::int AS latest_record_id
         FROM records
         WHERE monitor_id = $1
           AND time >= $2
           AND time <= $3
         GROUP BY DATE_TRUNC('hour', time)
+        HAVING COUNT(*) FILTER (WHERE dehydration_score > 0) > 0
         ORDER BY time ASC;
     `;
 
