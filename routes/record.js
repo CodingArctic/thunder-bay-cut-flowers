@@ -9,6 +9,35 @@ const express = require(`express`),
 const { analyzeImage } = require('../scripts/cv_analyze.js');
 const { sendAlertEmail } = require('../services/email/mailer');
 
+function normalizeScore(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+        return null;
+    }
+
+    return Math.max(0, Math.min(1, numeric));
+}
+
+async function resolvePersistedScore(monitorID, analysis) {
+    const analysisScore = normalizeScore(analysis && analysis.score);
+    if (analysisScore !== null && analysisScore > 0) {
+        return { score: analysisScore, source: 'analysis' };
+    }
+
+    const recentRecords = await db.getPastRecords(monitorID, 1);
+    const priorScore = recentRecords && recentRecords.length > 0
+        ? normalizeScore(recentRecords[recentRecords.length - 1].dehydration_score)
+        : null;
+
+    if (priorScore !== null && priorScore > 0) {
+        return { score: priorScore, source: 'previous_record' };
+    }
+
+    const configuredFallback = normalizeScore(process.env.CV_FALLBACK_SCORE || '0.65');
+    const fallbackScore = configuredFallback !== null && configuredFallback > 0 ? configuredFallback : 0.65;
+    return { score: fallbackScore, source: 'configured_default' };
+}
+
 function getDeviceApiKey(req) {
     const headerValue = req.get('x-device-api-key') || req.get('x-api-key');
     if (!headerValue) {
@@ -39,6 +68,10 @@ async function handleRecordUpload(req, res, monitorID) {
     if (req.files && Object.keys(req.files).length !== 0) {
         const uploadedFile = req.files.flower;
 
+        if (!uploadedFile) {
+            return res.status(400).json({ "error": "Missing image field 'flower'" });
+        }
+
         if (uploadedFile.mimetype !== 'image/jpeg') {
             return res.status(400).json({ "error": "Invalid file type" });
         }
@@ -49,7 +82,7 @@ async function handleRecordUpload(req, res, monitorID) {
         const imagePath = path.join(uploadPath, imageName);
 
         if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath);
+            fs.mkdirSync(uploadPath, { recursive: true });
         }
 
         try {
@@ -65,9 +98,21 @@ async function handleRecordUpload(req, res, monitorID) {
         (async () => {
             try {
                 const analysis = await analyzeImage(imagePath);
-                const score = (analysis && analysis.score !== undefined) ? analysis.score : 0.0;
+                const { score, source: scoreSource } = await resolvePersistedScore(resolvedMonitorID, analysis);
                 const alertThreshold = Number(process.env.ALERT_EMAIL_SCORE_THRESHOLD || "0.8");
                 const alertCooldownHours = Number(process.env.ALERT_EMAIL_COOLDOWN_HOURS || "24");
+                const scoreFromFallback = scoreSource !== 'analysis';
+
+                if (scoreFromFallback) {
+                    console.warn(`Background analysis used fallback score`, {
+                        monitorID: resolvedMonitorID,
+                        imageName,
+                        score,
+                        scoreSource,
+                        cvSucceeded: analysis !== null,
+                        llmStatus: analysis ? analysis.llm_status : null,
+                    });
+                }
 
                 let insertedRecord = await db.addRecord(resolvedMonitorID, score, imageName);
                 if (!insertedRecord) {
@@ -75,7 +120,7 @@ async function handleRecordUpload(req, res, monitorID) {
                 }
 
                 // Email alerts are optional and env-gated; failures are logged but never break ingestion.
-                if (score <= alertThreshold) {
+                if (!scoreFromFallback && score <= alertThreshold) {
                     try {
                         const inCooldown = await db.hasRecentAlert(resolvedMonitorID, "dehydration", "email", alertCooldownHours);
                         if (inCooldown) {
@@ -156,6 +201,7 @@ async function handleRecordUpload(req, res, monitorID) {
                     cvScore: analysis ? analysis.cv_score : null,
                     geminiScore: analysis ? analysis.llm_score : null,
                     combinedScore: score,
+                    scoreSource,
                     dbInsertSucceeded: Boolean(insertedRecord),
                 });
             } catch (err) {
