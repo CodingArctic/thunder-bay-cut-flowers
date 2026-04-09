@@ -65,6 +65,15 @@ export function Navbar() {
 
   useEffect(() => {
     loadNotificationSettings();
+    loadRecentAlerts();
+
+    const pollInterval = window.setInterval(() => {
+      loadRecentAlerts();
+    }, 60000);
+
+    return () => {
+      window.clearInterval(pollInterval);
+    };
   }, []);
 
   useEffect(() => {
