@@ -153,12 +153,11 @@ def analyze(image_path):
     if plant_zones:
         avg_score = sum(r["value"] for r in plant_zones) / len(plant_zones)
         worst_score = min(r["value"] for r in plant_zones)
-        # Blend average with worst zone so localized problems aren't hidden
-        cv_score = avg_score * 0.5 + worst_score * 0.5
-        # Extra penalty for each unhealthy zone (score < 0.75)
-        unhealthy = [r for r in plant_zones if r["value"] < 0.75]
+        cv_score = avg_score * 0.7 + worst_score * 0.3 # Changed from 0.5/0.5 to 0.7/0.3 to weight average more heavily, as worst-score was too noisy 
+        # and often not representative of overall health due to lighting/artifacts affecting a single zone.
+        unhealthy = [r for r in plant_zones if r["value"] < 0.60] # Threshold for "unhealthy" zones, can be tuned based on observed data. Zones below this score are considered to be in poor health.
         if unhealthy:
-            penalty = len(unhealthy) / len(plant_zones) * 0.20
+            penalty = len(unhealthy) / len(plant_zones) * 0.10 # decreased to 0.10 penalty if all zones are unhealthy, scaled by the proportion of unhealthy zones. This encourages the model to consider overall health and not just the average.
             cv_score = max(0.0, cv_score - penalty)
         cv_score = float(round(cv_score, 4))
     else:
