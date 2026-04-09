@@ -75,6 +75,14 @@ export function Dashboard() {
     };
     if (monitorID) {
       fetchData();
+
+      const pollInterval = window.setInterval(() => {
+        fetchData();
+      }, 60000);
+
+      return () => {
+        window.clearInterval(pollInterval);
+      };
     }
   }, [monitorID]);
 

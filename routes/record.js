@@ -143,6 +143,21 @@ async function handleRecordUpload(req, res, monitorID) {
                             } else {
                                 let sentCount = 0;
                                 for (const recipient of recipients) {
+                                    const notificationsEnabled = await db.isMonitorEmailNotificationEnabled(
+                                        resolvedMonitorID,
+                                        recipient
+                                    );
+                                    if (!notificationsEnabled) {
+                                        console.info(`Alert email skipped`, {
+                                            monitorID: resolvedMonitorID,
+                                            imageName,
+                                            score,
+                                            recipient,
+                                            reason: `notifications-disabled`,
+                                        });
+                                        continue;
+                                    }
+
                                     const emailResult = await sendAlertEmail({
                                         monitorId: resolvedMonitorID,
                                         score,
