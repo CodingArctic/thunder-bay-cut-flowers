@@ -14,8 +14,8 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmedUsername = username.trim();
-    if (trimmedUsername.length < 8 || password.length < 8) {
-      setError('Both username and password must be 8+ characters.');
+    if (trimmedUsername.length < 4 || password.length < 8) {
+      setError('Username must be 4+ characters, and password must be 8+ characters.');
       return;
     }
     try {

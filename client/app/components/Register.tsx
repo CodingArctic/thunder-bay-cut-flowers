@@ -31,8 +31,8 @@ export default function Register() {
     const trimmedEmail     = email.trim();
     const trimmedPhone     = phoneNumber.replace(/\D/g, '');
 
-    if (trimmedUsername.length < 8 || password.length < 8) {
-      setError('Both username and password must be 8+ characters.');
+    if (trimmedUsername.length < 4 || password.length < 8) {
+      setError('Username must be 4+ characters, and password must be 8+ characters.');
       return;
     }
 
