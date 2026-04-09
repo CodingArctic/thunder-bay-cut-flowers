@@ -35,9 +35,6 @@ interface CreateMonitorResponse {
   apiKey: string;
 }
 
-type NotificationKey =
-  | "emailNotifications" | "textNotifications";
-
 type ToggleProps = {
   enabled: boolean;
   onToggle: () => void;
@@ -55,10 +52,6 @@ export function Settings() {
   const [claiming, setClaiming] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createdDevice, setCreatedDevice] = useState<{ monitorID: number; name: string; apiKey: string } | null>(null);
-  const [notifications, setNotifications] = useState<Record<NotificationKey, boolean>>({
-    emailNotifications: false,
-    textNotifications: false,
-  });
 
   const loadMonitors = async () => {
     try {
@@ -158,13 +151,6 @@ export function Settings() {
     } catch {
       setDeviceError('Could not copy API key. Copy it manually for now.');
     }
-  };
-
-  const toggleNotification = (key: NotificationKey) => {
-    setNotifications((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
   };
 
   const Toggle = ({ enabled, onToggle }: ToggleProps) => (
