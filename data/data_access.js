@@ -522,6 +522,38 @@ async function getMonitorUserEmails(monitorID) {
 }
 
 /**
+ * Check whether notifications are enabled for a specific monitor/email recipient
+ * @param {int} monitorID - The monitor ID
+ * @param {string} email - Recipient email
+ * @returns {boolean} True when notifications are enabled for the recipient
+ */
+async function isMonitorEmailNotificationEnabled(monitorID, email) {
+    const text = `
+        SELECT 1
+        FROM users u
+        INNER JOIN users_monitors um ON um.user_id = u.user_id
+        WHERE um.monitor_id = $1
+          AND u.email = $2
+          AND (
+              CASE
+                  WHEN jsonb_typeof(u.settings #> '{notifications,enabled}') = 'boolean'
+                  THEN (u.settings #>> '{notifications,enabled}')::boolean
+                  ELSE true
+              END
+          ) = true
+        LIMIT 1;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, email]);
+        return rows.length > 0;
+    } catch (err) {
+        console.error("isMonitorEmailNotificationEnabled error:", err);
+        return false;
+    }
+}
+
+/**
  * Get recent alerts for monitors associated with a user
  * @param {int} userID - The user's ID
  * @param {int} limit - Maximum alert rows to return
@@ -577,6 +609,7 @@ module.exports = {
     getMonitors,
     updateUserSettings,
     getRecentAlertsForUser,
+    isMonitorEmailNotificationEnabled,
     associateUserToMonitor,
     getMonitorUserEmails,
     addAlert,
