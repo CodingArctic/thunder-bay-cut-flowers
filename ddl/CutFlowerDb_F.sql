@@ -16,7 +16,8 @@ CREATE TABLE users (
     password TEXT NOT NULL,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
-    phone_number TEXT
+    phone_number TEXT,
+    settings JSONB NOT NULL DEFAULT '{"notifications": {"enabled": true}}'::jsonb
 );
 
 COMMENT ON TABLE users IS 'Stores authenticated application users';
