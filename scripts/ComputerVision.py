@@ -62,7 +62,11 @@ class GridZoneManager:
 
 def white_balance(image):
     lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB).astype(np.float32)
-    l, a, b = cv2.split(lab)
+    l, a, b = cv2.split(lab) # Forgot to add the L in LAB for white balance.
+    l_mean = float(l.mean()) # L mean measures overall luminance 
+    if 25.0 <= l_mean < 110.0:
+        gain = min(1.20, 110.0 / l_mean) # if the image is dim, increase L gain by 1.2 to better expose details
+        l = np.clip(l * gain, 0, 255)
     a = np.clip(a + (128 - np.mean(a)), 0, 255)
     b = np.clip(b + (128 - np.mean(b)), 0, 255)
     return cv2.cvtColor(cv2.merge([l, a, b]).astype(np.uint8), cv2.COLOR_LAB2BGR)
@@ -165,6 +169,8 @@ class CVScorer:
                 return 0.0, "no_plant"
             elif (b + y) < 0.04 and pigment < 0.12:
                 return 0.0, "no_plant"
+            elif gq < 0.65 and pigment < 0.18: # addition of green quality analysis broke the No_plant detection. Fixed here by allowing low pigment zones to still be classified.
+                return 0.0, "no_plant"
 
         pigment_score = min(1.0, pigment / 0.35)
         # Severity from trend history makes brown/yellow thresholds tighter
@@ -250,8 +256,10 @@ class CVScorer:
         green_quality = 1.0
         green_pixels = hsv[green_mask > 0]
         if len(green_pixels) > 100:
+            v_median = float(np.median(hsv[:, :, 2])) # uses overall image brightness to create dynamic green quality threshold.
+            v_thresh = max(60.0, v_median * 0.6)
             saturation_mean = np.mean(green_pixels[:, 1] >= 45)
-            value_mean = np.mean(green_pixels[:, 2] >= 100)
+            value_mean = np.mean(green_pixels[:, 2] >= v_thresh)
             green_quality = (saturation_mean * 0.5 + value_mean * 0.5)
             
         return {
@@ -271,6 +279,10 @@ class CVScorer:
     def _ssim(self, i1, i2):
         g1 = cv2.cvtColor(i1, cv2.COLOR_BGR2GRAY).astype(np.float64)
         g2 = cv2.cvtColor(i2, cv2.COLOR_BGR2GRAY).astype(np.float64)
+        g1 = (g1 - g1.mean()) / (g1.std() + 1e-6) # Normalize luminance so brightness offsets between baseline and
+        g2 = (g2 - g2.mean()) / (g2.std() + 1e-6) # current frame don't tank the structural similarity score.
+        g1 = np.clip(g1 * 64.0 + 128.0, 0, 255)
+        g2 = np.clip(g2 * 64.0 + 128.0, 0, 255)
         C1, C2 = (0.01*255)**2, (0.03*255)**2
         m1 = cv2.GaussianBlur(g1, (11, 11), 1.5)
         m2 = cv2.GaussianBlur(g2, (11, 11), 1.5)
@@ -280,9 +292,16 @@ class CVScorer:
         ssim = ((2*m1*m2+C1)*(2*s12+C2)) / ((m1**2+m2**2+C1)*(s1+s2+C2))
         return float(max(0, np.mean(ssim)))
 
-    def _spot_detect(self, i1, i2):
-        e1 = cv2.Canny(cv2.cvtColor(i1, cv2.COLOR_BGR2GRAY), 50, 150)
-        e2 = cv2.Canny(cv2.cvtColor(i2, cv2.COLOR_BGR2GRAY), 50, 150)
+    def _spot_detect(self, i1, i2): 
+        g1 = cv2.cvtColor(i1, cv2.COLOR_BGR2GRAY) 
+        g2 = cv2.cvtColor(i2, cv2.COLOR_BGR2GRAY) # removed thresholds to account for brightness 
+        def _auto_canny(gray, sigma=0.33):
+            m = float(np.median(gray))
+            lo = int(max(0, (1.0 - sigma) * m))
+            hi = int(min(255, (1.0 + sigma) * m))
+            return cv2.Canny(gray, lo, hi)
+        e1 = _auto_canny(g1)
+        e2 = _auto_canny(g2)
         d1, d2 = np.sum(e1 > 0) / e1.size, np.sum(e2 > 0) / e2.size
         return min(1.0, max(0, (d2 - d1) / d1)) if d1 > 0 else 0
     
@@ -339,15 +358,3 @@ class PlantHealthCV:
         cv2.imwrite(os.path.join(self.save_dir, f"overview_{ts_str}.jpg"), overview)
 
         return results
-
-    def get_zone_mapping(self):
-        return {
-            z["zone_id"]: {
-                "monitor_id": self.monitor_id_start + i,
-                "row": z["row"], "col": z["col"],
-                "x": z["x"], "y": z["y"], "w": z["w"], "h": z["h"],
-            }
-            for i, z in enumerate(self.grid.zones)
-        }
-
-
