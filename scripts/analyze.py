@@ -127,7 +127,6 @@ Respond with ONLY a decimal number, nothing else. Example: 0.73"""
                 config=types.GenerateContentConfig(
                     temperature=0.2,
                     max_output_tokens=500,
-                    thinking_budget=0
                 ),
             )
 
