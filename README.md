@@ -22,3 +22,6 @@ To check out our System and User Documentation, please visit our [Wiki](https://
   - Frontend Development
 - Muhammad Kamran
   - Database Designer
+
+## Problem Statement
+When flowers are grown with the intention of cutting them for bouquets, a small degradation in appearance can have a big impact on the price that they can be sold for. A system that could monitor the flowers and provide alerts in real-time for any identified problems, such as dehydration, would help ensure premium harvests.
