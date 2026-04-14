@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import { apiRequest } from '../utils/api-request';
+import { SetupDevicePrompt } from './SetupDevicePrompt';
 
 interface MonitorSummary {
   monitor_id: number;
@@ -28,6 +29,7 @@ export function Dashboard() {
   const [error, setError] = useState('');
   const [monitorID, setMonitorID] = useState('');
   const [monitorOptions, setMonitorOptions] = useState<MonitorSummary[]>([]);
+  const [isLoadingMonitors, setIsLoadingMonitors] = useState<boolean>(true);
   const [chartData, setChartData] = useState<any[]>([]);
   const [latestRecordID, setLatestRecordID] = useState<number | null>(null);
   const [latestScore, setLatestScore] = useState<number>(0);
@@ -46,6 +48,8 @@ export function Dashboard() {
         }
       } catch (error: any) {
         setError(error.message);
+      } finally {
+        setIsLoadingMonitors(false);
       }
     };
     fetchMonitors();
@@ -89,6 +93,20 @@ export function Dashboard() {
   const showNeutralHealthState = !hasLoadedData || isLoadingData;
   const healthEmoji = showNeutralHealthState ? '😐' : getHealthEmoji(latestScore);
 
+  if (!isLoadingMonitors && monitorOptions.length === 0) {
+    return (
+      <div>
+        <div className="flex items-center gap-2 mb-8">
+          <div className="w-8 h-8 bg-[#ffb84d] rounded-lg flex items-center justify-center">
+            <span className="text-xl">📊</span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800">DASHBOARD</h1>
+        </div>
+        <SetupDevicePrompt pageName="Dashboard" />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-8">
@@ -97,6 +115,8 @@ export function Dashboard() {
         </div>
         <h1 className="text-2xl font-bold text-gray-800">DASHBOARD</h1>
       </div>
+
+      {error ? <div className="mb-4 text-sm text-red-700">{error}</div> : null}
 
       <div className="grid grid-cols-1 gap-6">
         {/* Recent Data Overview */}
