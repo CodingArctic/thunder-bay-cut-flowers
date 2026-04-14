@@ -1,7 +1,7 @@
 # ISTE 500/501 Cut Flowers Project
 
 ## Documentation
-To check out our System and User Documentation, please vsit our [Wiki](https://github.com/CodingArctic/thunder-bay-cut-flowers/wiki)!
+To check out our System and User Documentation, please visit our [Wiki](https://github.com/CodingArctic/thunder-bay-cut-flowers/wiki)!
 
 ## Authors
 ### Team Thunder Bay *(previously known as Group 7)*
