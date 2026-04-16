@@ -194,8 +194,19 @@ def analyze(image_path):
 
     trend_penalty = trend_data["trend_penalty"]
 
+    # Confidence-weighted blending: when CV can't detect much plant material
+    # (low pigment), reduce its weight so it doesn't drag down the LLM score.
+    # CV confidence is based on average pigment coverage across plant zones.
+    if plant_zones:
+        avg_pigment = sum(r["cv_details"]["pigment_pct"] for r in plant_zones) / len(plant_zones) / 100.0
+    else:
+        avg_pigment = 0.0
+    cv_confidence = min(1.0, avg_pigment / 0.35)  # 0.0 at 0% pigment, 1.0 at 35%+
+
     if llm_score is not None:
-        combined = float(round(cv_score * 0.3 + llm_score * 0.7, 4))
+        cv_weight = 0.30 * cv_confidence
+        llm_weight = 1.0 - cv_weight
+        combined = float(round(cv_score * cv_weight + llm_score * llm_weight, 4))
     else:
         combined = cv_score
 
@@ -204,6 +215,7 @@ def analyze(image_path):
     return {
         "score": final_score,
         "cv_score": cv_score,
+        "cv_confidence": round(cv_confidence, 4),
         "llm_score": llm_score,
         "llm_used": llm_score is not None,
         "llm_status": llm_status,
