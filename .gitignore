@@ -3,3 +3,4 @@ node_modules/
 scripts/__pycache__/
 scripts/captures/
 arduino_secrets.h
+trend_history.json

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../utils/api-request';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
+import { SetupDevicePrompt } from './SetupDevicePrompt';
 
 
 interface MonitorSummary {
@@ -27,7 +28,7 @@ interface RangeResponse {
   data: RangeRecord[];
 }
 
-const radius = 40;
+const radius = 50;
 const circumference = 2 * Math.PI * radius;
 
 // Helper function to get emoji based on health score
@@ -47,10 +48,12 @@ export function Data() {
   const [error, setError] = useState('');
   const [monitorID, setMonitorID] = useState('');
   const [monitorOptions, setMonitorOptions] = useState<MonitorSummary[]>([]);
+  const [isLoadingMonitors, setIsLoadingMonitors] = useState<boolean>(true);
   const [records, setRecords] = useState<any[]>([]);
   const [chartRecords, setChartRecords] = useState<any[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const [aggregation, setAggregation] = useState<'auto' | 'raw' | 'hour'>('auto');
+  const presetOptions = ['6H', '1D', '7D', '14D'];
 
   // const [startDate, setStartDate] = useState<string>('');
   // const [endDate, setEndDate] = useState<string>('');
@@ -58,6 +61,24 @@ export function Data() {
     const offset = date.getTimezoneOffset();
     const local = new Date(date.getTime() - offset * 60000);
     return local.toISOString().slice(0, 16);
+  }
+
+  function usePreset(presetName: string) {
+    let number = parseInt(presetName);
+    let letter = presetName.match(/[A-Z]/)?.at(0);
+    let start = new Date(Date.now());
+    let end = new Date(Date.now());
+
+    if (letter == 'H') {
+      start.setHours(start.getHours() - number);
+      setStartDate(toLocalDatetimeInput(start));
+      setEndDate(toLocalDatetimeInput(end));
+    } else if (letter == 'D') {
+      start.setDate(start.getDate() - number);
+      setStartDate(toLocalDatetimeInput(start));
+      setEndDate(toLocalDatetimeInput(end));
+    }
+    return;
   }
 
   const [startDate, setStartDate] = useState(() => {
@@ -83,6 +104,8 @@ export function Data() {
         }
       } catch (error: any) {
         setError(error.message);
+      } finally {
+        setIsLoadingMonitors(false);
       }
     };
     fetchMonitors();
@@ -133,7 +156,25 @@ export function Data() {
     }
   }, [monitorID, startDate, endDate]);
 
-  const progress = selectedRecord ? selectedRecord.dehydration_score : 0;
+  const progress = Math.min(
+    1,
+    Math.max(0, Number(selectedRecord?.dehydration_score ?? 0))
+  );
+
+  if (!isLoadingMonitors && monitorOptions.length === 0) {
+    return (
+      <div>
+        <div className="flex items-center gap-2 mb-8">
+          <div className="w-8 h-8 bg-[#ffb84d] rounded-lg flex items-center justify-center">
+            <span className="text-xl">📊</span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800">DATA</h1>
+        </div>
+        <SetupDevicePrompt pageName="Data" />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-8">
@@ -143,6 +184,8 @@ export function Data() {
         <h1 className="text-2xl font-bold text-gray-800">DATA</h1>
       </div>
 
+      {error ? <div className="mb-4 text-sm text-red-700">{error}</div> : null}
+
       <div className="grid grid-cols-1 gap-6 ">
         {/* Data Overview */}
         <div className="space-y-6">
@@ -150,51 +193,68 @@ export function Data() {
             <h2 className="text-lg font-bold text-gray-800 mb-4 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
               DATA OVERVIEW
             </h2>
-            <div className="mb-4">
-              <label htmlFor="monitor-select" className="block text-sm font-medium text-gray-700 mb-2">
-                Select Monitor:
-              </label>
-              <div className="w-full max-w-sm">
-                <select
-                  id="monitor-select"
-                  value={monitorID}
-                  onChange={(e) => setMonitorID(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
-                >
-                  <option value="">-- Select a Monitor --</option>
-                  {monitorOptions.map((monitor) => (
-                    <option key={monitor.monitor_id} value={monitor.monitor_id}>
-                      {monitor.name} (ID {monitor.monitor_id})
-                    </option>
-                  ))}
-                </select>
+            <div className="flex flex-row items-center place-content-between flex-wrap">
+              <div>
+                <label htmlFor="monitor-select" className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Monitor:
+                </label>
+                <div className="w-full max-w-sm">
+                  <select
+                    id="monitor-select"
+                    value={monitorID}
+                    onChange={(e) => setMonitorID(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
+                  >
+                    <option value="">-- Select a Monitor --</option>
+                    {monitorOptions.map((monitor) => (
+                      <option key={monitor.monitor_id} value={monitor.monitor_id}>
+                        {monitor.name} (ID {monitor.monitor_id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              <div className='flex flex-row my-6'>
+                { 
+                  presetOptions.map((option) => {
+                    return <div
+                    key={option}
+                    className='p-3 mx-2 w-12 flex flex-col items-center text-gray-800 bg-[#ffb84d] text-center font-bold cursor-pointer rounded-lg'
+                    onClick={() => {usePreset(option)}}
+                    >
+                      {option}
+                    </div>;
+                  })
+                }
+              </div>
+
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 text-gray-700 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="datetime-local"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 text-gray-700 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
+                />
               </div>
-            
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  End Date
+                </label>
+                <input
+                  type="datetime-local"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 text-gray-800 rounded-lg bg-white focus:outline-none focus:border-[#ffb84d] focus:ring-2 focus:ring-[#ffb84d]/30"
+                />
+              </div>
+            </div>
+
             <div className="mt-6">
               {chartRecords.length ?
                 <ResponsiveContainer width="100%" height={250}>
@@ -233,7 +293,7 @@ export function Data() {
                 : <h1 className='text-gray-800 text-center m-auto mb-8'>No records, try another date range!</h1>
               }
             </div>
-            
+
             <div className="mt-6 space-y-2 max-h-75 overflow-y-auto">
               {records.map((record, index) => (
                 <div
@@ -261,40 +321,40 @@ export function Data() {
         {/* Photo and Health Score */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Overall Flower Health */}
-          <div className="bg-[#ffd9a3] rounded-lg p-6 shadow-sm">
-            <h2 className="text-sm font-bold text-gray-800 mb-4 bg-[#ffe4b8] inline-block px-3 py-1 rounded">
-              FLOWER HEALTH AT SELECTED TIME
-            </h2>
+          <div className="bg-[#ffd9a3] rounded-lg pt-6 px-6 pb-4 shadow-sm flex flex-col">
+            <h2 className="text-lg font-bold text-gray-800">FLOWER HEALTH AT SELECTED TIME</h2>
 
-            <div className="bg-[#ffe4b8] rounded-lg p-6 text-center mt-4">
-              <div className="text-6xl mb-4">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
-              <div className="flex items-center justify-center">
-                <div className="relative">
-                  <svg width="100" height="100" viewBox="0 0 100 100">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="#ffd9a3"
-                      strokeWidth="8"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="#ff6b6b"
-                      strokeWidth="8"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={circumference * (1 - progress)}
-                      strokeLinecap="butt"
-                      transform="rotate(-90 50 50)"
-                    />
-                    <text x="50" y="58" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#333">
-                      {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : ''}
-                    </text>
-                  </svg>
+            <div className="flex-1 flex items-center py-4">
+              <div className="bg-[#ffe4b8] border border-[#f2c27d] rounded-lg p-6 text-center w-full">
+                <div className="flex items-center justify-center gap-6">
+                  <div className="text-6xl md:text-8xl leading-none">{selectedRecord ? getHealthEmoji(selectedRecord.dehydration_score) : '😐'}</div>
+                  <div className="relative">
+                    <svg width="120" height="120" viewBox="0 0 120 120">
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="50"
+                        fill="none"
+                        stroke="#ffd9a3"
+                        strokeWidth="10"
+                      />
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r="50"
+                        fill="none"
+                        stroke="#ff6b6b"
+                        strokeWidth="10"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={circumference * (1 - progress)}
+                        strokeLinecap="butt"
+                        transform="rotate(-90 60 60)"
+                      />
+                      <text x="60" y="70" textAnchor="middle" fontSize="28" fontWeight="bold" fill="#333">
+                        {selectedRecord ? `${Math.round(selectedRecord.dehydration_score * 100)}%` : ''}
+                      </text>
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>

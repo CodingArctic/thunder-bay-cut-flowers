@@ -62,7 +62,11 @@ class GridZoneManager:
 
 def white_balance(image):
     lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB).astype(np.float32)
-    l, a, b = cv2.split(lab)
+    l, a, b = cv2.split(lab) # Forgot to add the L in LAB for white balance.
+    l_mean = float(l.mean()) # L mean measures overall luminance 
+    if 25.0 <= l_mean < 110.0:
+        gain = min(1.20, 110.0 / l_mean) # if the image is dim, increase L gain by 1.2 to better expose details
+        l = np.clip(l * gain, 0, 255)
     a = np.clip(a + (128 - np.mean(a)), 0, 255)
     b = np.clip(b + (128 - np.mean(b)), 0, 255)
     return cv2.cvtColor(cv2.merge([l, a, b]).astype(np.uint8), cv2.COLOR_LAB2BGR)
@@ -73,6 +77,13 @@ class CVScorer:
         self.baselines = {}
         self.baseline_colors = {}
         self.baseline_times = {}
+        self.zone_adjustments = {}
+
+    def set_zone_adjustments(self, adjustments):
+        """Set per-zone severity multipliers from trend history.
+        adjustments: dict of zone_id -> float (1.0 = normal, >1.0 = harsher)
+        """
+        self.zone_adjustments = adjustments
 
     def set_baseline(self, zone_id, image):
         self.baselines[zone_id] = image.copy()
@@ -84,8 +95,9 @@ class CVScorer:
     def score(self, zone_id, image):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         cur = self._color_ratios(hsv)
-        
-        abs_score, abs_cat = self._absolute_score(cur)
+        severity = self.zone_adjustments.get(zone_id, 1.0)
+
+        abs_score, abs_cat = self._absolute_score(cur, severity)
 
         if zone_id not in self.baselines:
             self.set_baseline(zone_id, image)
@@ -102,8 +114,8 @@ class CVScorer:
 
         green_ret = min(1.0, cur["green"] / base_colors["green"]) if base_colors["green"] > 0.01 else 1.0
         pigment_ret = min(1.0, cur["pigment"] / base_colors["pigment"]) if base_colors["pigment"] > 0.01 else 1.0
-        brown_pen = min(1.0, max(0, cur["brown"] - base_colors["brown"]) / 0.20)
-        yellow_pen = min(1.0, max(0, cur["yellow"] - base_colors["yellow"]) / 0.30)
+        brown_pen = min(1.0, max(0, cur["brown"] - base_colors["brown"]) / (0.20 / severity))
+        yellow_pen = min(1.0, max(0, cur["yellow"] - base_colors["yellow"]) / (0.30 / severity))
         hist_sim = self._hist_sim(base_hsv, hsv)
         texture_sim = self._ssim(baseline, image)
         spot_score = self._spot_detect(baseline, image)
@@ -144,29 +156,34 @@ class CVScorer:
                                        spot_score=spot_score)
         return health, cat, details
 
-    def _absolute_score(self, color_ratios):
+    def _absolute_score(self, color_ratios, severity=1.0):
         g = color_ratios["green"]
         b = color_ratios["brown"]
         y = color_ratios["yellow"]
-        pigment = color_ratios["pigment"]  
-        plant_coverage = pigment + b + y   
+        pigment = color_ratios["pigment"]
+        gq = color_ratios["green_quality"]
+        plant_coverage = pigment + b + y
 
         if plant_coverage < 0.20:
             if plant_coverage < 0.08:
                 return 0.0, "no_plant"
             elif (b + y) < 0.04 and pigment < 0.12:
                 return 0.0, "no_plant"
-            
+            elif gq < 0.65 and pigment < 0.18: # addition of green quality analysis broke the No_plant detection. Fixed here by allowing low pigment zones to still be classified.
+                return 0.0, "no_plant"
+
         pigment_score = min(1.0, pigment / 0.35)
-        brown_penalty = min(1.0, b / 0.10)
-        yellow_penalty = min(1.0, y / 0.20)
+        # Severity from trend history makes brown/yellow thresholds tighter
+        brown_penalty = min(1.0, b / (0.05 / severity))
+        yellow_penalty = min(1.0, y / (0.20 / severity))
         coverage_score = min(1.0, plant_coverage / 0.20)
 
         score = (
-            pigment_score * 0.45 +
-            (1.0 - brown_penalty) * 0.25 +
+            pigment_score * 0.30 +
+            gq * 0.15 +
+            (1.0 - brown_penalty) * 0.35 +
             (1.0 - yellow_penalty) * 0.10 +
-            coverage_score * 0.20
+            coverage_score * 0.10
         )
         score = max(0.0, min(1.0, score))
 
@@ -189,6 +206,7 @@ class CVScorer:
         """Build details dict for a scored zone."""
         details = {
             "green_pct": round(cur["green"] * 100, 1),
+            "green_quality_pct": round(cur["green_quality"] * 100, 1),
             "red_pct": round(cur["red"] * 100, 1),
             "magenta_pct": round(cur["magenta"] * 100, 1),
             "purple_pct": round(cur["purple"] * 100, 1),
@@ -222,22 +240,33 @@ class CVScorer:
 
     def _color_ratios(self, hsv):
         t = hsv.shape[0] * hsv.shape[1]
-        g = np.sum(cv2.inRange(hsv, np.array([25, 40, 40]), np.array([85, 255, 255])) > 0) / t
+        green_mask = cv2.inRange(hsv, np.array([25, 40, 40]), np.array([85, 255, 255]))
+        g = np.sum(green_mask > 0) / t
         purple = np.sum(cv2.inRange(hsv, np.array([120, 30, 30]), np.array([140, 255, 255])) > 0) / t
         magenta = np.sum(cv2.inRange(hsv, np.array([140, 40, 40]), np.array([160, 255, 255])) > 0) / t
         red_hi = np.sum(cv2.inRange(hsv, np.array([160, 50, 40]), np.array([180, 255, 255])) > 0) / t
         red_lo = np.sum(cv2.inRange(hsv, np.array([0, 80, 40]), np.array([10, 255, 255])) > 0) / t
 
-        b = np.sum(cv2.inRange(hsv, np.array([0, 20, 20]), np.array([20, 80, 180])) > 0) / t
+        b = np.sum(cv2.inRange(hsv, np.array([5, 20, 30]), np.array([25, 180, 220])) > 0) / t
 
         y = np.sum(cv2.inRange(hsv, np.array([15, 40, 50]), np.array([25, 255, 255])) > 0) / t
 
         pigment = g + red_lo + red_hi + magenta + purple
 
+        green_quality = 1.0
+        green_pixels = hsv[green_mask > 0]
+        if len(green_pixels) > 100:
+            v_median = float(np.median(hsv[:, :, 2])) # uses overall image brightness to create dynamic green quality threshold.
+            v_thresh = max(60.0, v_median * 0.6)
+            saturation_mean = np.mean(green_pixels[:, 1] >= 45)
+            value_mean = np.mean(green_pixels[:, 2] >= v_thresh)
+            green_quality = (saturation_mean * 0.5 + value_mean * 0.5)
+            
         return {
             "green": g, "brown": b, "yellow": y,
             "red": red_lo + red_hi, "magenta": magenta, "purple": purple,
             "pigment": pigment,
+            "green_quality": green_quality,
         }
 
     def _hist_sim(self, h1, h2):
@@ -250,6 +279,10 @@ class CVScorer:
     def _ssim(self, i1, i2):
         g1 = cv2.cvtColor(i1, cv2.COLOR_BGR2GRAY).astype(np.float64)
         g2 = cv2.cvtColor(i2, cv2.COLOR_BGR2GRAY).astype(np.float64)
+        g1 = (g1 - g1.mean()) / (g1.std() + 1e-6) # Normalize luminance so brightness offsets between baseline and
+        g2 = (g2 - g2.mean()) / (g2.std() + 1e-6) # current frame don't tank the structural similarity score.
+        g1 = np.clip(g1 * 64.0 + 128.0, 0, 255)
+        g2 = np.clip(g2 * 64.0 + 128.0, 0, 255)
         C1, C2 = (0.01*255)**2, (0.03*255)**2
         m1 = cv2.GaussianBlur(g1, (11, 11), 1.5)
         m2 = cv2.GaussianBlur(g2, (11, 11), 1.5)
@@ -259,9 +292,16 @@ class CVScorer:
         ssim = ((2*m1*m2+C1)*(2*s12+C2)) / ((m1**2+m2**2+C1)*(s1+s2+C2))
         return float(max(0, np.mean(ssim)))
 
-    def _spot_detect(self, i1, i2):
-        e1 = cv2.Canny(cv2.cvtColor(i1, cv2.COLOR_BGR2GRAY), 50, 150)
-        e2 = cv2.Canny(cv2.cvtColor(i2, cv2.COLOR_BGR2GRAY), 50, 150)
+    def _spot_detect(self, i1, i2): 
+        g1 = cv2.cvtColor(i1, cv2.COLOR_BGR2GRAY) 
+        g2 = cv2.cvtColor(i2, cv2.COLOR_BGR2GRAY) # removed thresholds to account for brightness 
+        def _auto_canny(gray, sigma=0.33):
+            m = float(np.median(gray))
+            lo = int(max(0, (1.0 - sigma) * m))
+            hi = int(min(255, (1.0 + sigma) * m))
+            return cv2.Canny(gray, lo, hi)
+        e1 = _auto_canny(g1)
+        e2 = _auto_canny(g2)
         d1, d2 = np.sum(e1 > 0) / e1.size, np.sum(e2 > 0) / e2.size
         return min(1.0, max(0, (d2 - d1) / d1)) if d1 > 0 else 0
     
@@ -318,15 +358,3 @@ class PlantHealthCV:
         cv2.imwrite(os.path.join(self.save_dir, f"overview_{ts_str}.jpg"), overview)
 
         return results
-
-    def get_zone_mapping(self):
-        return {
-            z["zone_id"]: {
-                "monitor_id": self.monitor_id_start + i,
-                "row": z["row"], "col": z["col"],
-                "x": z["x"], "y": z["y"], "w": z["w"], "h": z["h"],
-            }
-            for i, z in enumerate(self.grid.zones)
-        }
-
-

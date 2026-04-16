@@ -97,10 +97,18 @@ async function insertData(table, data = {}) {
  * @returns {Object|null} Inserted record row or null on failure
  */
 async function addRecord(monitorID, value, imgName) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        console.error(`Invalid dehydration_score; expected finite numeric value`, { monitorID, value, imgName });
+        return null;
+    }
+
+    const boundedValue = Math.max(0, Math.min(1, numericValue));
+
     let newRecord = await insertData(`records`, {
         monitor_id: monitorID,
         time: new Date(),
-        dehydration_score: value,
+        dehydration_score: boundedValue,
         file_path: `/imgs/${monitorID}/${imgName}`
     });
     if (!newRecord) {
@@ -242,7 +250,7 @@ async function getUserByEmail(email) {
  */
 async function getUserById(userId) {
     const users = await getData("users", 
-        ["user_id", "email", "username", "first_name", "last_name", "phone_number"], 
+        ["user_id", "email", "username", "first_name", "last_name", "phone_number", "settings"], 
         { user_id: userId }
     );
 
@@ -251,6 +259,29 @@ async function getUserById(userId) {
     }
 
     return users[0];
+}
+
+/**
+ * Merge user settings JSON into existing settings
+ * @param {int} userId
+ * @param {Object} settingsPatch
+ * @returns {Object|null}
+ */
+async function updateUserSettings(userId, settingsPatch = {}) {
+    const text = `
+        UPDATE users
+        SET settings = COALESCE(settings, '{}'::jsonb) || $2::jsonb
+        WHERE user_id = $1
+        RETURNING user_id, email, username, first_name, last_name, phone_number, settings;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [userId, JSON.stringify(settingsPatch)]);
+        return rows[0] || null;
+    } catch (err) {
+        console.error("updateUserSettings error:", err);
+        return null;
+    }
 }
 
 
@@ -356,17 +387,26 @@ async function getHourlyAverageRecordsInRange(monitorID, startTime, endTime) {
     const text = `
         SELECT
             DATE_TRUNC('hour', time) AS time,
-            AVG(dehydration_score)::double precision AS dehydration_score,
-            MIN(dehydration_score)::double precision AS min_dehydration_score,
-            MAX(dehydration_score)::double precision AS max_dehydration_score,
-                        COUNT(*)::int AS sample_count,
-                        (ARRAY_AGG(record_id ORDER BY time ASC))[1]::int AS first_record_id,
-                        (ARRAY_AGG(record_id ORDER BY time DESC))[1]::int AS latest_record_id
+            AVG(dehydration_score) FILTER (WHERE dehydration_score > 0)::double precision AS dehydration_score,
+            MIN(dehydration_score) FILTER (WHERE dehydration_score > 0)::double precision AS min_dehydration_score,
+            MAX(dehydration_score) FILTER (WHERE dehydration_score > 0)::double precision AS max_dehydration_score,
+            COUNT(*) FILTER (WHERE dehydration_score > 0)::int AS sample_count,
+            COUNT(*)::int AS total_sample_count,
+            COUNT(*) FILTER (WHERE dehydration_score = 0)::int AS excluded_zero_count,
+            COALESCE(
+                (ARRAY_AGG(record_id ORDER BY time ASC) FILTER (WHERE dehydration_score > 0))[1],
+                (ARRAY_AGG(record_id ORDER BY time ASC))[1]
+            )::int AS first_record_id,
+            COALESCE(
+                (ARRAY_AGG(record_id ORDER BY time DESC) FILTER (WHERE dehydration_score > 0))[1],
+                (ARRAY_AGG(record_id ORDER BY time DESC))[1]
+            )::int AS latest_record_id
         FROM records
         WHERE monitor_id = $1
           AND time >= $2
           AND time <= $3
         GROUP BY DATE_TRUNC('hour', time)
+        HAVING COUNT(*) FILTER (WHERE dehydration_score > 0) > 0
         ORDER BY time ASC;
     `;
 
@@ -462,6 +502,13 @@ async function getMonitorUserEmails(monitorID) {
         FROM users u
         INNER JOIN users_monitors um ON um.user_id = u.user_id
         WHERE um.monitor_id = $1
+          AND (
+              CASE
+                  WHEN jsonb_typeof(u.settings #> '{notifications,enabled}') = 'boolean'
+                  THEN (u.settings #>> '{notifications,enabled}')::boolean
+                  ELSE true
+              END
+          ) = true
         ORDER BY u.email ASC;
     `;
 
@@ -470,6 +517,76 @@ async function getMonitorUserEmails(monitorID) {
         return rows.map(r => r.email);
     } catch (err) {
         console.error("getMonitorUserEmails error:", err);
+        return [];
+    }
+}
+
+/**
+ * Check whether notifications are enabled for a specific monitor/email recipient
+ * @param {int} monitorID - The monitor ID
+ * @param {string} email - Recipient email
+ * @returns {boolean} True when notifications are enabled for the recipient
+ */
+async function isMonitorEmailNotificationEnabled(monitorID, email) {
+    const text = `
+        SELECT 1
+        FROM users u
+        INNER JOIN users_monitors um ON um.user_id = u.user_id
+        WHERE um.monitor_id = $1
+          AND u.email = $2
+          AND (
+              CASE
+                  WHEN jsonb_typeof(u.settings #> '{notifications,enabled}') = 'boolean'
+                  THEN (u.settings #>> '{notifications,enabled}')::boolean
+                  ELSE true
+              END
+          ) = true
+        LIMIT 1;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [monitorID, email]);
+        return rows.length > 0;
+    } catch (err) {
+        console.error("isMonitorEmailNotificationEnabled error:", err);
+        return false;
+    }
+}
+
+/**
+ * Get recent alerts for monitors associated with a user
+ * @param {int} userID - The user's ID
+ * @param {int} limit - Maximum alert rows to return
+ * @returns {Array} Recent alerts
+ */
+async function getRecentAlertsForUser(userID, limit = 10) {
+    const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(limit, 100)) : 10;
+
+    const text = `
+        SELECT
+            a.alert_id,
+            a.alert_type,
+            a.alert_method,
+            a.triggered_at,
+            r.record_id,
+            r.monitor_id,
+            r.time AS record_time,
+            r.dehydration_score,
+            m.name AS monitor_name
+        FROM users_monitors um
+        INNER JOIN records r ON r.monitor_id = um.monitor_id
+        INNER JOIN alerts a ON a.record_id = r.record_id
+        INNER JOIN monitors m ON m.monitor_id = r.monitor_id
+        WHERE um.user_id = $1
+        ORDER BY a.triggered_at DESC
+        LIMIT $2;
+    `;
+
+    try {
+        const { rows } = await pool.query(text, [userID, safeLimit]);
+        return rows;
+    } catch (err) {
+        console.error("getRecentAlertsForUser error:", err);
         return [];
     }
 }
@@ -490,6 +607,9 @@ module.exports = {
     getRecordById,
     userCanAccessMonitor,
     getMonitors,
+    updateUserSettings,
+    getRecentAlertsForUser,
+    isMonitorEmailNotificationEnabled,
     associateUserToMonitor,
     getMonitorUserEmails,
     addAlert,

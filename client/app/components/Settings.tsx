@@ -35,9 +35,6 @@ interface CreateMonitorResponse {
   apiKey: string;
 }
 
-type NotificationKey =
-  | "emailNotifications" | "textNotifications";
-
 type ToggleProps = {
   enabled: boolean;
   onToggle: () => void;
@@ -55,10 +52,6 @@ export function Settings() {
   const [claiming, setClaiming] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createdDevice, setCreatedDevice] = useState<{ monitorID: number; name: string; apiKey: string } | null>(null);
-  const [notifications, setNotifications] = useState<Record<NotificationKey, boolean>>({
-    emailNotifications: false,
-    textNotifications: false,
-  });
 
   const loadMonitors = async () => {
     try {
@@ -160,13 +153,6 @@ export function Settings() {
     }
   };
 
-  const toggleNotification = (key: NotificationKey) => {
-    setNotifications((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
-
   const Toggle = ({ enabled, onToggle }: ToggleProps) => (
     <button
       type="button"
@@ -233,34 +219,6 @@ export function Settings() {
             </div>
           ) : null}
         </div>
-
-        {/* Notifications and Device Management */}
-        <div className="space-y-6">
-          {/* Notifications */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-gray-800 mb-6 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
-              NOTIFICATIONS
-            </h2>
-            
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700">Email</span>
-                <Toggle
-                  enabled={notifications.emailNotifications}
-                  onToggle={() => toggleNotification("emailNotifications")}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700">Text</span>
-                <Toggle
-                  enabled={notifications.textNotifications}
-                  onToggle={() => toggleNotification("textNotifications")}
-                />
-              </div>
-            </div>
-          </div>
-
           {/* Device Management */}
           <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm">
             <h2 className="text-lg font-bold text-gray-800 mb-6 bg-[#ffd9a3] inline-block px-4 py-2 rounded">
@@ -341,7 +299,6 @@ export function Settings() {
               {deviceError ? <p className="text-sm text-red-700">{deviceError}</p> : null}
             </div>
           </div>
-        </div>
       </div>
     </div>
   );
