@@ -27,8 +27,8 @@ To check out our System and User Documentation, please visit our [Wiki](https://
 - Green Valley Farms (has access to Gosnell Greenhouse & sample data)
   - Username: `green_valley`
   - Password: `grower1pw`
-- Sunset Farms (has access to only sample data)
-  - Username: `sunset_farms`
+- Sunrise Farms (has access to only sample data)
+  - Username: `sunrise_farms`
   - Password: `grower2pw`
 
 ## Problem Statement
