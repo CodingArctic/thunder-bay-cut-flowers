@@ -4,12 +4,15 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiRequest } from '../utils/api-request';
+import logo from '../assets/images/thunder-bay-logo.png';
+
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
+
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -30,6 +33,8 @@ export default function Login() {
     <div className="min-h-screen bg-[#fef9e6] relative overflow-hidden flex items-center justify-center px-4">
       {/* Login Form */}
       <div className="bg-white rounded-lg shadow-lg p-10 w-full max-w-md relative z-10">
+        {/* <img src="client\app\assets\images\thunder-bay-logo.png" alt="Thunder Bay Logo" className="mx-auto mb-8" /> */}
+        <img src={logo.src} alt="Thunder Bay Logo" className="mx-auto mb-8 w-60"/>
         <h1 className="text-2xl font-bold text-gray-800 mb-8">WELCOME BACK</h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
