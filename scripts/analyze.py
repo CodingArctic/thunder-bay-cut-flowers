@@ -65,6 +65,13 @@ from trend_tracker import record, analyze_trends, get_zone_adjustments
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 
 
+def env_flag(name, default=True):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def run_cv(image_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     captures_root = os.path.join(script_dir, "captures")
@@ -114,8 +121,13 @@ def run_gemini(image_path):
     prompt = """You are a plant health analyst. Look at this greenhouse image carefully.
 Check for any signs of dead, brown, or wilting leaves, disease spots, discoloration, or other health issues.
 
-Based on what you see in the image, provide a health score from 0.00 to 1.00 (0=dead, 1=perfect).
-Respond with ONLY a decimal number, nothing else. Example: 0.73"""
+Based on what you see in the image, provide a health score from 0.00 to 1.00 considering the following ranges:
+score >= 0.9 is Excellent Condition,
+score >= 0.7 is Good Condition,
+score >= 0.5 is Fair Condition,
+score >= 0.3 is Poor Condition,
+score less than 0.3 is Critical Condition.
+Respond with ONLY a number to two decimal places, nothing else. Example: 0.73"""
     last_status = "all_models_failed"
     last_raw = None
     for model in GEMINI_MODELS:
@@ -147,10 +159,15 @@ Respond with ONLY a decimal number, nothing else. Example: 0.73"""
 
 
 def analyze(image_path):
-    results, capture_dir = run_cv(image_path)
+    cv_enabled = env_flag("CV_ANALYSIS_ENABLED", True)
+
+    if cv_enabled:
+        results, capture_dir = run_cv(image_path)
+    else:
+        results, capture_dir = [], None
 
     plant_zones = [r for r in results if r["category"] != "no_plant"]
-    if plant_zones:
+    if cv_enabled and plant_zones:
         avg_score = sum(r["value"] for r in plant_zones) / len(plant_zones)
         worst_score = min(r["value"] for r in plant_zones)
         cv_score = avg_score * 0.7 + worst_score * 0.3 # Changed from 0.5/0.5 to 0.7/0.3 to weight average more heavily, as worst-score was too noisy 
@@ -161,10 +178,10 @@ def analyze(image_path):
             cv_score = max(0.0, cv_score - penalty)
         cv_score = float(round(cv_score, 4))
     else:
-        cv_score = 0.0
+        cv_score = 0.0 if cv_enabled else None
     worst = min(plant_zones, key=lambda r: r["value"]) if plant_zones else None
 
-    overview_dir = capture_dir
+    overview_dir = capture_dir if cv_enabled else None
 
     # Defaults keep scoring stable if trend persistence is temporarily unavailable.
     trend_data = {
@@ -175,7 +192,7 @@ def analyze(image_path):
 
     try:
         # Find the overview image for this run only.
-        overview_files = sorted([f for f in os.listdir(overview_dir) if f.startswith("overview_")]) if os.path.exists(overview_dir) else []
+        overview_files = sorted([f for f in os.listdir(overview_dir) if f.startswith("overview_")]) if overview_dir and os.path.exists(overview_dir) else []
         overview_path = os.path.join(overview_dir, overview_files[-1]) if overview_files else image_path
 
         # Send to Gemini (use overview if available, otherwise use original image)
@@ -183,13 +200,14 @@ def analyze(image_path):
         llm_score, llm_status, llm_raw, llm_model_used = run_gemini(image_to_analyze)
 
         # Record this run and check for declining trends
-        try:
-            record(results)
-            trend_data = analyze_trends(results)
-        except Exception as e:
-            print(f"Warning: trend tracking unavailable: {e}", file=sys.stderr)
+        if cv_enabled and results:
+            try:
+                record(results)
+                trend_data = analyze_trends(results)
+            except Exception as e:
+                print(f"Warning: trend tracking unavailable: {e}", file=sys.stderr)
     finally:
-        if os.path.exists(overview_dir):
+        if overview_dir and os.path.exists(overview_dir):
             shutil.rmtree(overview_dir, ignore_errors=True)
 
     trend_penalty = trend_data["trend_penalty"]
@@ -197,23 +215,27 @@ def analyze(image_path):
     # Confidence-weighted blending: when CV can't detect much plant material
     # (low pigment), reduce its weight so it doesn't drag down the LLM score.
     # CV confidence is based on average pigment coverage across plant zones.
-    if plant_zones:
+    if cv_enabled and plant_zones:
         avg_pigment = sum(r["cv_details"]["pigment_pct"] for r in plant_zones) / len(plant_zones) / 100.0
     else:
         avg_pigment = 0.0
     cv_confidence = min(1.0, avg_pigment / 0.35)  # 0.0 at 0% pigment, 1.0 at 35%+
 
     if llm_score is not None:
-        cv_weight = 0.30 * cv_confidence
-        llm_weight = 1.0 - cv_weight
-        combined = float(round(cv_score * cv_weight + llm_score * llm_weight, 4))
+        if cv_enabled and cv_score is not None:
+            cv_weight = 0.30 * cv_confidence
+            llm_weight = 1.0 - cv_weight
+            combined = float(round(cv_score * cv_weight + llm_score * llm_weight, 4))
+        else:
+            combined = llm_score
     else:
-        combined = cv_score
+        combined = cv_score if cv_enabled else None
 
-    final_score = float(round(max(0.0, combined - trend_penalty), 4))
+    final_score = None if combined is None else float(round(max(0.0, combined - trend_penalty), 4))
 
     return {
         "score": final_score,
+        "cv_enabled": cv_enabled,
         "cv_score": cv_score,
         "cv_confidence": round(cv_confidence, 4),
         "llm_score": llm_score,
