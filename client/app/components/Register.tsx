@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { apiRequest } from '../utils/api-request';
+import logo from '../assets/images/thunder-bay-logo.png';
+
 
 export default function Register() {
   const [firstName, setFirstName] = useState('');
@@ -59,6 +61,7 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-[#fef9e6] flex items-center justify-center px-4">
       <div className="bg-white rounded-lg shadow-lg p-10 w-full max-w-md">
+        <img src={logo.src} alt="Thunder Bay Logo" className="mx-auto mb-8 w-60"/>
         <h1 className="text-2xl font-bold text-gray-800 mb-8">
           CREATE ACCOUNT
         </h1>

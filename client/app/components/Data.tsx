@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../utils/api-request';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
+import { SetupDevicePrompt } from './SetupDevicePrompt';
 
 
 interface MonitorSummary {
@@ -47,6 +48,7 @@ export function Data() {
   const [error, setError] = useState('');
   const [monitorID, setMonitorID] = useState('');
   const [monitorOptions, setMonitorOptions] = useState<MonitorSummary[]>([]);
+  const [isLoadingMonitors, setIsLoadingMonitors] = useState<boolean>(true);
   const [records, setRecords] = useState<any[]>([]);
   const [chartRecords, setChartRecords] = useState<any[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
@@ -102,6 +104,8 @@ export function Data() {
         }
       } catch (error: any) {
         setError(error.message);
+      } finally {
+        setIsLoadingMonitors(false);
       }
     };
     fetchMonitors();
@@ -156,6 +160,21 @@ export function Data() {
     1,
     Math.max(0, Number(selectedRecord?.dehydration_score ?? 0))
   );
+
+  if (!isLoadingMonitors && monitorOptions.length === 0) {
+    return (
+      <div>
+        <div className="flex items-center gap-2 mb-8">
+          <div className="w-8 h-8 bg-[#ffb84d] rounded-lg flex items-center justify-center">
+            <span className="text-xl">📊</span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800">DATA</h1>
+        </div>
+        <SetupDevicePrompt pageName="Data" />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-8">
@@ -164,6 +183,8 @@ export function Data() {
         </div>
         <h1 className="text-2xl font-bold text-gray-800">DATA</h1>
       </div>
+
+      {error ? <div className="mb-4 text-sm text-red-700">{error}</div> : null}
 
       <div className="grid grid-cols-1 gap-6 ">
         {/* Data Overview */}
