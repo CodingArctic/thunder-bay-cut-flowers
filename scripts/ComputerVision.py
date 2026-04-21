@@ -210,6 +210,9 @@ class CVScorer:
             "red_pct": round(cur["red"] * 100, 1),
             "magenta_pct": round(cur["magenta"] * 100, 1),
             "purple_pct": round(cur["purple"] * 100, 1),
+            "blue_pct": round(cur["blue"] * 100, 1),
+            "orange_pct": round(cur["orange"] * 100, 1),
+            "white_flower_pct": round(cur["white_flower"] * 100, 1),
             "pigment_pct": round(cur["pigment"] * 100, 1),
             "brown_pct": round(cur["brown"] * 100, 1),
             "yellow_pct": round(cur["yellow"] * 100, 1),
@@ -242,16 +245,31 @@ class CVScorer:
         t = hsv.shape[0] * hsv.shape[1]
         green_mask = cv2.inRange(hsv, np.array([25, 40, 40]), np.array([85, 255, 255]))
         g = np.sum(green_mask > 0) / t
+
+        # Blue fills the H 85-120 gap between green and purple
+        blue = np.sum(cv2.inRange(hsv, np.array([85, 40, 40]), np.array([120, 255, 255])) > 0) / t
+
         purple = np.sum(cv2.inRange(hsv, np.array([120, 30, 30]), np.array([140, 255, 255])) > 0) / t
         magenta = np.sum(cv2.inRange(hsv, np.array([140, 40, 40]), np.array([160, 255, 255])) > 0) / t
         red_hi = np.sum(cv2.inRange(hsv, np.array([160, 50, 40]), np.array([180, 255, 255])) > 0) / t
         red_lo = np.sum(cv2.inRange(hsv, np.array([0, 80, 40]), np.array([10, 255, 255])) > 0) / t
 
-        b = np.sum(cv2.inRange(hsv, np.array([5, 20, 30]), np.array([25, 180, 220])) > 0) / t
+        # Orange / vivid warm tones — high saturation separates from brown decay
+        orange = np.sum(cv2.inRange(hsv, np.array([5, 130, 100]), np.array([25, 255, 255])) > 0) / t
 
-        y = np.sum(cv2.inRange(hsv, np.array([15, 40, 50]), np.array([25, 255, 255])) > 0) / t
+        # Brown (decay) — S capped at 130 so vivid orange isn't penalized
+        b = np.sum(cv2.inRange(hsv, np.array([5, 20, 30]), np.array([25, 130, 200])) > 0) / t
 
-        pigment = g + red_lo + red_hi + magenta + purple
+        # Yellow (stress) — S capped at 130 so vivid yellow flowers aren't penalized
+        y = np.sum(cv2.inRange(hsv, np.array([15, 40, 50]), np.array([25, 130, 255])) > 0) / t
+
+        # White flowers — low saturation, high brightness (S > 5 excludes pure gray surfaces)
+        white_flower = np.sum(cv2.inRange(hsv, np.array([0, 5, 200]), np.array([180, 50, 255])) > 0) / t
+
+        # Blue is tracked but NOT added to pigment — H 85-120 overlaps too
+        # heavily with greenhouse backgrounds (trays, walls, sky through glass).
+        # Blue flowers rely on surrounding green foliage for scoring.
+        pigment = g + red_lo + red_hi + magenta + purple + orange + white_flower
 
         green_quality = 1.0
         green_pixels = hsv[green_mask > 0]
@@ -261,10 +279,11 @@ class CVScorer:
             saturation_mean = np.mean(green_pixels[:, 1] >= 45)
             value_mean = np.mean(green_pixels[:, 2] >= v_thresh)
             green_quality = (saturation_mean * 0.5 + value_mean * 0.5)
-            
+
         return {
             "green": g, "brown": b, "yellow": y,
             "red": red_lo + red_hi, "magenta": magenta, "purple": purple,
+            "blue": blue, "orange": orange, "white_flower": white_flower,
             "pigment": pigment,
             "green_quality": green_quality,
         }

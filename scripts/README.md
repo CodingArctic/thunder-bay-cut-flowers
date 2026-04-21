@@ -57,12 +57,14 @@ Create a `.env` file in the **project root** (not in scripts/):
 ```
 GEMINI_API_KEY=your_api_key_here
 GEMINI_MODEL=gemini-3.1-flash-lite-preview
+CV_ANALYSIS_ENABLED=true
 CV_TIMEOUT_MS=60000
 ```
 
 The scripts will automatically load this file.
 
 `GEMINI_MODEL` is optional. If not set, the default is `gemini-3.1-flash-lite-preview`.
+`CV_ANALYSIS_ENABLED` is optional. Set it to `false` to skip CV and score using Gemini only.
 `CV_TIMEOUT_MS` is optional. Increase it if API/network latency is high.
 
 ## Node.js Integration
